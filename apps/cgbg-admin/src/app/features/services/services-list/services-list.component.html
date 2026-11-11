@@ -1,0 +1,131 @@
+<div class="services-container">
+  <header class="section-header">
+    <div class="header-text">
+      <h1 class="title">Servicios y Categorías</h1>
+      <p class="subtitle">Gestiona tu catálogo de bienestar y belleza.</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn-secondary" (click)="onAddCategory()">
+        <i-lucide name="tag" class="btn-icon"></i-lucide>
+        Nueva Categoría
+      </button>
+      <button class="btn-primary" (click)="onAddService()">
+        <i-lucide name="plus" class="btn-icon"></i-lucide>
+        Nuevo Servicio
+      </button>
+    </div>
+  </header>
+
+  <div *ngIf="isLoading()" class="loading-state">
+    <div class="spinner"></div>
+    <p>Sincronizando servicios...</p>
+  </div>
+
+  <div *ngIf="!isLoading()" class="categories-list">
+    <!-- Listado por categorías -->
+    <div *ngFor="let cat of categories()" class="category-section">
+      <div class="category-header" (click)="toggleCategory(cat.id)">
+        <div class="category-info">
+          <i-lucide name="chevron-down" class="expand-icon" [class.collapsed]="!isExpanded(cat.id)"></i-lucide>
+          <span class="category-name">{{ cat.name }}</span>
+          <span class="badge">{{ cat.services?.length || 0 }}</span>
+        </div>
+        <div class="category-actions">
+          <button class="btn-icon-only" (click)="$event.stopPropagation(); onEditCategory(cat)" title="Editar Categoría">
+            <i-lucide name="edit-2" class="icon-sm"></i-lucide>
+          </button>
+          <button class="btn-icon-only delete-btn" (click)="$event.stopPropagation(); onDeleteCategory(cat.id)" title="Eliminar Categoría">
+            <i-lucide name="trash-2" class="icon-sm"></i-lucide>
+          </button>
+          <button class="btn-icon-only" (click)="$event.stopPropagation(); onAddService(cat.id)" title="Añadir Servicio">
+            <i-lucide name="plus" class="icon-sm"></i-lucide>
+          </button>
+        </div>
+      </div>
+
+      <div class="category-content" *ngIf="isExpanded(cat.id)">
+        <div class="services-grid" *ngIf="cat.services && cat.services.length > 0">
+          <div *ngFor="let service of cat.services" class="service-card">
+            <div class="service-visual">
+              <img *ngIf="service.imageUrl" [src]="service.imageUrl" alt="Servicio">
+              <div *ngIf="!service.imageUrl" class="image-placeholder">
+                <i-lucide name="scissors" class="icon-md"></i-lucide>
+              </div>
+              <div class="service-color" [style.background-color]="service.color || '#4A8E8A'"></div>
+            </div>
+            
+            <div class="service-details">
+              <h3 class="service-name">{{ service.name }}</h3>
+              <p class="service-desc">{{ service.description || 'Sin descripción disponible.' }}</p>
+              <div class="service-meta">
+                <span class="meta-item">{{ service.durationMin }} min</span>
+                <span class="meta-price">{{ service.price | currency:'MXN':'symbol':'1.0-2' }}</span>
+              </div>
+            </div>
+
+            <div class="service-actions">
+              <button class="btn-icon-only" (click)="onEditService(service)" title="Editar">
+                <i-lucide name="edit-2" class="icon-sm"></i-lucide>
+              </button>
+              <button class="btn-icon-only delete-btn" (click)="onDeleteService(service.id)" title="Eliminar">
+                <i-lucide name="trash-2" class="icon-sm"></i-lucide>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="empty-state-mini" *ngIf="!cat.services || cat.services.length === 0">No hay servicios en esta categoría todavía.</div>
+      </div>
+    </div>
+
+    <!-- Servicios sin categoría -->
+    <div class="category-section" *ngIf="uncategorizedServices().length > 0">
+      <div class="category-header" (click)="toggleCategory('uncategorized')">
+        <div class="category-info">
+          <i-lucide name="chevron-down" class="expand-icon" [class.collapsed]="!isExpanded('uncategorized')"></i-lucide>
+          <span class="category-name">Sin Categoría</span>
+          <span class="badge">{{ uncategorizedServices().length }}</span>
+        </div>
+      </div>
+      <div class="category-content" *ngIf="isExpanded('uncategorized')">
+        <div class="services-grid">
+          <div *ngFor="let service of uncategorizedServices()" class="service-card">
+            <!-- Reuse card layout as above -->
+            <div class="service-visual">
+              <img *ngIf="service.imageUrl" [src]="service.imageUrl" alt="Servicio">
+              <div *ngIf="!service.imageUrl" class="image-placeholder"><i-lucide name="scissors" class="icon-md"></i-lucide></div>
+            </div>
+            <div class="service-details">
+              <h3 class="service-name">{{ service.name }}</h3>
+              <p class="service-desc">{{ service.description }}</p>
+              <div class="service-meta">
+                <span class="meta-item">{{ service.durationMin }} min</span>
+                <span class="meta-price">{{ service.price | currency:'MXN':'symbol':'1.0-2' }}</span>
+              </div>
+            </div>
+            <div class="service-actions">
+              <button class="btn-icon-only" (click)="onEditService(service)"><i-lucide name="edit-2" class="icon-sm"></i-lucide></button>
+              <button class="btn-icon-only delete-btn" (click)="onDeleteService(service.id)"><i-lucide name="trash-2" class="icon-sm"></i-lucide></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODALS -->
+  <app-service-form 
+    *ngIf="showServiceModal()"
+    [service]="selectedService()"
+    [categoryId]="targetCategoryId()"
+    [categories]="categories()"
+    (close)="onModalClose()"
+    (saved)="onSave()"
+  ></app-service-form>
+
+  <app-category-form
+    *ngIf="showCategoryModal()"
+    [category]="selectedCategory()"
+    (close)="onModalClose()"
+    (saved)="onSave()"
+  ></app-category-form>
+</div>

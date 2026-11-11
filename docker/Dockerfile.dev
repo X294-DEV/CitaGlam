@@ -1,0 +1,13 @@
+FROM node:20
+
+# Directorio de trabajo coincidente con Dev Container
+WORKDIR /workspaces/cgbg
+
+# Instalar pnpm y CLIs globales sugeridas
+RUN npm install -g pnpm @nestjs/cli @angular/cli prisma
+
+# Copiar archivos base para aprovechamiento de caché (Opcional, se sobreescribe con volúmenes en dev)
+COPY package.json ./
+
+# Puerto de desarrollo NestJS
+EXPOSE 3001

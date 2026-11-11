@@ -1,0 +1,128 @@
+<div class="settings-container">
+  <header class="section-header">
+    <h1 class="title">Configuración del Negocio</h1>
+    <p class="subtitle">Gestiona tus datos de contacto y horarios de operación.</p>
+  </header>
+
+  <nav class="settings-nav">
+    <button (click)="activeTab.set('info')" [class.active]="activeTab() === 'info'">
+      <i-lucide name="building-2"></i-lucide>
+      Información General
+    </button>
+    <button (click)="activeTab.set('schedule')" [class.active]="activeTab() === 'schedule'">
+      <i-lucide name="clock"></i-lucide>
+      Horarios de Atención
+    </button>
+    <button (click)="activeTab.set('exceptions')" [class.active]="activeTab() === 'exceptions'">
+      <i-lucide name="calendar"></i-lucide>
+      Días Especiales y Cierres
+    </button>
+  </nav>
+
+  <main class="settings-content glass-panel">
+    <!-- INFO TAB -->
+    <section *ngIf="activeTab() === 'info'" class="tab-pane">
+      <form [formGroup]="branchForm" (ngSubmit)="saveBranchInfo()" class="info-form">
+        <div class="form-grid">
+          <div class="form-group full-width">
+            <label>Nombre de la Sucursal</label>
+            <div class="input-with-icon">
+              <i-lucide name="building-2" class="icon-sm"></i-lucide>
+              <input type="text" formControlName="name" placeholder="Ej: Sucursal Central Zen">
+            </div>
+          </div>
+          <div class="form-group full-width">
+            <label>Dirección Completa</label>
+            <div class="input-with-icon">
+              <i-lucide name="map-pin" class="icon-sm"></i-lucide>
+              <input type="text" formControlName="address">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Ciudad</label>
+            <input type="text" formControlName="city">
+          </div>
+          <div class="form-group">
+            <label>Teléfono de Contacto</label>
+            <div class="input-with-icon">
+              <i-lucide name="phone" class="icon-sm"></i-lucide>
+              <input type="text" formControlName="phone">
+            </div>
+          </div>
+        </div>
+        <div class="form-footer">
+          <button type="submit" class="btn-primary" [disabled]="branchForm.invalid">Guardar Información</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- SCHEDULE TAB -->
+    <section *ngIf="activeTab() === 'schedule'" class="tab-pane">
+      <div class="schedule-intro">
+        <div class="alert info">
+          <i-lucide name="alert-circle" class="alert-icon"></i-lucide>
+          <p>Define tus horarios semanales recurrentes. El sistema usará estos rangos para calcular tu disponibilidad en el calendario.</p>
+        </div>
+      </div>
+
+      <form [formGroup]="scheduleForm" (ngSubmit)="saveSchedules()" class="schedule-form">
+        <div formArrayName="schedules" class="schedule-list">
+          <div *ngFor="let sGroup of schedulesArray.controls; let i = index" [formGroupName]="i" class="schedule-row">
+            <div class="day-label">
+              <span class="day-name">{{ days[i] }}</span>
+              <label class="switch">
+                <input type="checkbox" formControlName="isOpen">
+                <span class="slider round"></span>
+              </label>
+              <span class="status-badge" [class.open]="sGroup.get('isOpen')?.value">{{ sGroup.get('isOpen')?.value ? 'Abierto' : 'Cerrado' }}</span>
+            </div>
+
+            <div class="hours-config" *ngIf="sGroup.get('isOpen')?.value">
+              <div class="time-range">
+                <input type="time" formControlName="openTime" step="1800">
+                <span class="sep">a</span>
+                <input type="time" formControlName="closeTime" step="1800">
+              </div>
+
+              <!-- Second Range Toggle -->
+              <div class="second-range-toggle" *ngIf="!sGroup.get('showSecondRange')?.value">
+                <button type="button" class="btn-mini" (click)="toggleSecondRange(i)" title="Añadir descanso o segundo turno">
+                  <i-lucide name="plus" class="icon-xs"></i-lucide>
+                  Partir Horario
+                </button>
+              </div>
+
+              <div class="time-range second" *ngIf="sGroup.get('showSecondRange')?.value">
+                <span class="sep">&</span>
+                <input type="time" formControlName="openTime2" step="1800">
+                <span class="sep">a</span>
+                <input type="time" formControlName="closeTime2" step="1800">
+                <button type="button" class="btn-icon-tiny" (click)="toggleSecondRange(i)">
+                   <i-lucide name="trash-2" class="icon-xs"></i-lucide>
+                </button>
+              </div>
+            </div>
+
+            <div class="closed-placeholder" *ngIf="!sGroup.get('isOpen')?.value">
+              Día no laboral. No se podrán agendar citas.
+            </div>
+          </div>
+        </div>
+
+        <div class="form-footer">
+          <button type="submit" class="btn-primary">Guardar Horarios</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- EXCEPTIONS TAB (PLACEHOLDER FOR MINI-CALENDAR) -->
+    <section *ngIf="activeTab() === 'exceptions'" class="tab-pane">
+      <div class="coming-soon">
+        <i-lucide name="calendar" class="icon-large"></i-lucide>
+        <h3>Gestor de Excepciones y Feriados</h3>
+        <p>Próximamente: Podrás marcar días específicos en un mini-calendario visual para bloqueos rápidos.</p>
+        <button class="btn-secondary" (click)="activeTab.set('schedule')">Regresar a Horarios</button>
+      </div>
+    </section>
+  </main>
+</div>

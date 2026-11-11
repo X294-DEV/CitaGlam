@@ -1,0 +1,310 @@
+:host {
+  display: block;
+  font-family: 'Inter', sans-serif;
+}
+
+.services-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* --- Header --- */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 2.5rem;
+}
+
+.title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 2.2rem;
+  font-weight: 600;
+  color: #2D4A47;
+  margin-bottom: 0.25rem;
+}
+
+.subtitle {
+  color: #888;
+  font-size: 0.95rem;
+}
+
+.header-actions {
+  display: flex;
+  gap: 1rem;
+}
+
+/* --- Buttons --- */
+.btn-primary, .btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.btn-primary {
+  background: #4A8E8A;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #3D7A76;
+  transform: translateY(-2px);
+}
+
+.btn-secondary {
+  background: white;
+  color: #4A8E8A;
+  border: 1px solid #4A8E8A;
+}
+
+.btn-secondary:hover {
+  background: #F9F7F2;
+}
+
+.btn-icon-only {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #888;
+  padding: 6px;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.btn-icon-only:hover {
+  background: rgba(0,0,0,0.03);
+  color: #4A8E8A;
+}
+
+.delete-btn:hover {
+  color: #E57373;
+}
+
+/* --- Categories --- */
+.category-section {
+  background: white;
+  border-radius: 18px;
+  margin-bottom: 1.5rem;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+  border: 1px solid #EAEAEA;
+}
+
+.category-header {
+  padding: 20px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  background: #FAFAFA;
+}
+
+.category-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.expand-icon {
+  width: 18px;
+  height: 18px;
+  color: #AAA;
+  transition: transform 0.3s ease;
+}
+
+.expand-icon.collapsed {
+  transform: rotate(-90deg);
+}
+
+.category-name {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #4A4A4A;
+}
+
+.badge {
+  background: #EBF2F1;
+  color: #4A8E8A;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.category-actions {
+  display: flex;
+  gap: 8px;
+  opacity: 0.2;
+  transition: opacity 0.2s ease;
+}
+
+.category-header:hover .category-actions {
+  opacity: 1;
+}
+
+/* --- Services (Elegant Hybrid Cards) --- */
+.category-content {
+  padding: 8px 24px 24px;
+}
+
+.services-grid {
+  display: grid;
+  grid-template-columns: 1fr; /* Lista de tarjetas por defecto */
+  gap: 12px;
+}
+
+.service-card {
+  display: flex;
+  align-items: center;
+  padding: 16px;
+  background: white;
+  border-radius: 14px;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.service-card:hover {
+  border-color: #EAEAEA;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.04);
+}
+
+.service-visual {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  min-width: 80px;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-right: 20px;
+}
+
+.service-visual img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-placeholder {
+  width: 100%;
+  height: 100%;
+  background: #F9F7F2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #D6D2C4;
+}
+
+.service-color {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+}
+
+.service-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.service-name {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.service-desc {
+  font-size: 0.85rem;
+  color: #888;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.service-meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.meta-item {
+  font-size: 0.8rem;
+  color: #AAA;
+  background: #F5F5F5;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.meta-price {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #4A8E8A;
+}
+
+.service-actions {
+  display: flex;
+  gap: 8px;
+  opacity: 0.1; /* Sutil por defecto */
+  transition: opacity 0.2s ease;
+}
+
+.service-card:hover .service-actions {
+  opacity: 1;
+}
+
+/* --- States --- */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4rem;
+  color: #888;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #F3F3F3;
+  border-top: 4px solid #4A8E8A;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.empty-state-mini {
+  padding: 2rem;
+  text-align: center;
+  color: #BBB;
+  font-style: italic;
+  font-size: 0.9rem;
+}
+
+/* --- Responsive Layout (Hybrid Card to Grid) --- */
+@media (min-width: 1024px) {
+  /* En pantallas muy grandes podrías optar por grid de 2 columnas si gustas */
+  /*.services-grid { grid-template-columns: 1fr 1fr; }*/
+}
+
+@media (max-width: 768px) {
+  .section-header { flex-direction: column; align-items: flex-start; gap: 1.25rem; }
+  .service-card { flex-direction: column; align-items: flex-start; }
+  .service-visual { margin-right: 0; margin-bottom: 12px; width: 100%; height: 120px; }
+  .service-actions { width: 100%; justify-content: flex-end; margin-top: 1rem; opacity: 1; border-top: 1px solid #F5F5F5; padding-top: 12px; }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "CGBG Dev Environment",
+  "dockerComposeFile": "../docker-compose.yml",
+  "service": "cgbg-backend",
+  "workspaceFolder": "/workspaces/cgbg",
+  "overrideCommand": true,
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "Prisma.prisma",
+        "Angular.ng-template",
+        "bradlc.vscode-tailwindcss",
+        "dbaeumer.vscode-eslint"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "terminal.integrated.defaultProfile.linux": "zsh"
+      }
+    }
+  },
+  "remoteUser": "node"
+}

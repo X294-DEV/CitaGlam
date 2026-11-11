@@ -1,0 +1,117 @@
+<div class="modal-overlay" *ngIf="isOpen()" (click)="close()">
+  <div class="modal-panel" (click)="$event.stopPropagation()">
+    <header class="modal-header">
+      <div class="header-title">
+        <i-lucide [name]="isEdit() ? 'info' : 'plus'" class="header-icon"></i-lucide>
+        <h2>{{ isEdit() ? 'Detalles de la Cita' : 'Agendar Nueva Cita' }}</h2>
+      </div>
+      <button class="close-btn" (click)="close()">
+        <i-lucide name="x"></i-lucide>
+      </button>
+    </header>
+
+    <main class="modal-content">
+      <form [formGroup]="appointmentForm" (ngSubmit)="save()">
+        
+        <!-- CLIENT SECTION -->
+        <div class="section-group">
+          <label class="section-label">Información del Cliente</label>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Nombre(s)</label>
+              <div class="input-with-icon">
+                <i-lucide name="user" class="icon-sm"></i-lucide>
+                <input type="text" formControlName="clientFirstName" placeholder="Ej: Juan">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Apellido(s)</label>
+              <input type="text" formControlName="clientLastName" placeholder="Ej: Pérez">
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Correo Electrónico</label>
+              <input type="email" formControlName="clientEmail" placeholder="juan@ejemplo.com">
+            </div>
+            <div class="form-group">
+              <label>Teléfono (Opcional)</label>
+              <input type="text" formControlName="clientPhone" placeholder="55 1234 5678">
+            </div>
+          </div>
+        </div>
+
+        <!-- APPOINTMENT SECTION -->
+        <div class="section-group">
+          <label class="section-label">Detalles del Servicio</label>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Servicio</label>
+              <div class="input-with-icon">
+                <i-lucide name="scissors" class="icon-sm"></i-lucide>
+                <select formControlName="serviceId">
+                  <option value="" disabled selected>Selecciona un servicio</option>
+                  <option *ngFor="let s of services()" [value]="s.id">{{ s.name }} ({{ s.price | currency }})</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Sucursal</label>
+              <select formControlName="branchId">
+                <option *ngFor="let b of branches()" [value]="b.id">{{ b.name }}</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-grid date-time-grid">
+            <div class="form-group">
+              <label>Fecha</label>
+              <div class="input-with-icon">
+                <i-lucide name="calendar" class="icon-sm"></i-lucide>
+                <input type="date" formControlName="date">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Hora (HH:00)</label>
+              <div class="input-with-icon">
+                <i-lucide name="clock" class="icon-sm"></i-lucide>
+                <select formControlName="startTime">
+                   <option *ngFor="let h of [8,9,10,11,12,13,14,15,16,17,18,19,20,21]" [value]="h.toString().padStart(2, '0') + ':00'">{{ h.toString().padStart(2, '0') + ':00' }}</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group full-width">
+            <label>Notas o Requerimientos Especiales</label>
+            <div class="input-with-icon">
+              <i-lucide name="align-left" class="icon-sm top-align"></i-lucide>
+              <textarea formControlName="notes" placeholder="Algún recordatorio o detalle extra..."></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div *ngIf="errorMessage()" class="modal-error">
+          {{ errorMessage() }}
+        </div>
+
+        <div class="form-footer">
+          <div class="footer-left">
+            <button *ngIf="isEdit()" type="button" class="btn-danger" [disabled]="isLoading()" (click)="deleteAppointment()">
+              <i-lucide name="trash-2" class="icon-xs"></i-lucide>
+              {{ isLoading() ? 'Cancelando...' : 'Cancelar Cita' }}
+            </button>
+          </div>
+          <div class="footer-right">
+            <button type="button" class="btn-secondary" (click)="close()">Cancelar</button>
+            <button *ngIf="!isEdit()" type="submit" class="btn-primary" [disabled]="appointmentForm.invalid || isLoading()">
+              <i-lucide *ngIf="!isLoading()" name="check" class="icon-xs"></i-lucide>
+              {{ isLoading() ? 'Guardando...' : 'Confirmar Reserva' }}
+            </button>
+            <button *ngIf="isEdit()" type="button" class="btn-primary" (click)="close()">Cerrar</button>
+          </div>
+        </div>
+      </form>
+    </main>
+  </div>
+</div>

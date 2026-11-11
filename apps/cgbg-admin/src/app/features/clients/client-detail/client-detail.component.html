@@ -1,0 +1,106 @@
+<div class="client-detail-container" *ngIf="client() as c">
+  <header class="detail-header">
+    <a routerLink="/admin/clients" class="back-link">
+      <i-lucide name="arrow-left"></i-lucide>
+      Volver a Clientes
+    </a>
+  </header>
+
+  <div class="detail-grid">
+    <!-- LEFT: Profile Card -->
+    <aside class="profile-sidebar">
+      <div class="card glass-panel profile-card">
+        <div class="profile-header">
+          <div class="detail-avatar">
+            {{ c.firstName[0] }}{{ c.lastName[0] }}
+          </div>
+          <h1>{{ c.firstName }} {{ c.lastName }}</h1>
+          <p class="role-tag">Cliente</p>
+        </div>
+
+        <div class="contact-list">
+          <div class="contact-item">
+            <i-lucide name="mail" class="contact-icon"></i-lucide>
+            <div class="contact-info">
+              <label>Correo</label>
+              <span>{{ c.email }}</span>
+            </div>
+          </div>
+          <div class="contact-item" *ngIf="c.phone">
+            <i-lucide name="phone" class="contact-icon"></i-lucide>
+            <div class="contact-info">
+              <label>Teléfono</label>
+              <span>{{ c.phone }}</span>
+            </div>
+          </div>
+          <div class="contact-item no-border">
+             <div class="whatsapp-card" *ngIf="getWhatsAppLink(c.phone || '')">
+               <a [href]="getWhatsAppLink(c.phone || '')" target="_blank" class="btn-wa">
+                 <i-lucide name="message-circle"></i-lucide>
+                 Contactar por WhatsApp
+               </a>
+             </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card glass-panel stats-card">
+        <label class="section-title">Resumen de Fidelidad</label>
+        <div class="stat-row">
+          <div class="stat-box">
+             <span class="stat-value">{{ c.totalSpent | currency }}</span>
+             <span class="stat-label">Inversión Total</span>
+          </div>
+          <div class="stat-box">
+             <span class="stat-value">{{ c.appointmentsCount }}</span>
+             <span class="stat-label">Asistencias</span>
+          </div>
+        </div>
+        <div class="stat-footer">
+          <label>Miembro desde:</label>
+          <span>{{ c.createdAt | date: 'MMMM yyyy' }}</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- RIGHT: History Timeline -->
+    <main class="history-content">
+      <div class="card glass-panel history-card">
+        <h3 class="card-title">Historial de Citas</h3>
+        
+        <div class="timeline" *ngIf="c.appointments && c.appointments.length > 0">
+          <div class="timeline-item" *ngFor="let app of c.appointments">
+             <div class="timeline-marker" [attr.data-status]="app.status">
+                <i-lucide [name]="getStatusIcon(app.status)" class="marker-icon"></i-lucide>
+             </div>
+             <div class="timeline-body">
+                <div class="timeline-header">
+                  <span class="app-date">{{ app.startTime | date: 'EEEE d, MMMM yyyy' }}</span>
+                  <span class="app-status-badge" [attr.data-status]="app.status">{{ app.status }}</span>
+                </div>
+                <div class="app-details">
+                  <div class="service-info">
+                    <span class="dot" [style.background-color]="app.service?.color"></span>
+                    <span class="service-name">{{ app.service?.name }}</span>
+                    <span class="app-price">{{ app.service?.price | currency }}</span>
+                  </div>
+                  <div class="branch-info">
+                    <i-lucide name="calendar" class="icon-tiny"></i-lucide>
+                    <span>{{ app.branch?.name }}</span>
+                    <span class="app-time">• {{ app.startTime | date: 'HH:00' }}</span>
+                  </div>
+                </div>
+                <p class="app-notes" *ngIf="app.notes">
+                  "{{ app.notes }}"
+                </p>
+             </div>
+          </div>
+        </div>
+
+        <div class="empty-history" *ngIf="!c.appointments || c.appointments.length === 0">
+          <p>Este cliente aún no tiene citas programadas.</p>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>

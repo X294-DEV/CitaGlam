@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <script>
+      // Nuclear Reset: Clear all service workers and caches immediately
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(registrations => {
+          for (const registration of registrations) {
+            console.warn('[Nuclear Reset] Unregistering Service Worker:', registration.scope);
+            registration.unregister();
+          }
+          if (registrations.length > 0) {
+            console.log('[Nuclear Reset] SW cleared. Forcing reload.');
+            window.location.reload(true);
+          }
+        });
+      }
+    </script>
+    <title>CitaGlam - Gestión de Citas</title>
+    <base href="/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/x-icon" href="brand/favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&amp;family=Outfit:wght@300;400;500;600&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@1.3.6/dist/quill.snow.css" />
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async="" defer=""></script>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <meta name="theme-color" content="#F9F7F2" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="CitaGlam Admin" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  </head>
+  <body>
+    <app-root></app-root>
+    <noscript>Please enable JavaScript to continue using this application.</noscript>
+  </body>
+</html>

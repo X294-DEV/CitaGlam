@@ -1,0 +1,43 @@
+<div class="modal-backdrop" (click)="onCancel()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <header class="modal-header">
+      <div class="header-text">
+        <h2 class="title">{{ category ? 'Editar Categoría' : 'Nueva Categoría' }}</h2>
+        <p class="subtitle">Organiza tus servicios para tus clientes.</p>
+      </div>
+      <button class="btn-icon" (click)="onCancel()">
+        <i-lucide name="x"></i-lucide>
+      </button>
+    </header>
+
+    <form [formGroup]="form" (ngSubmit)="onSubmit()" class="modal-body">
+      <div class="form-group">
+        <label for="name">Nombre de la Categoría</label>
+        <div class="input-with-icon">
+          <i-lucide name="tag" class="icon-sm"></i-lucide>
+          <input type="text" id="name" formControlName="name" placeholder="Ej: Barbería, Spa, Uñas...">
+        </div>
+        <div *ngIf="form.get('name')?.invalid && form.get('name')?.touched" class="error-text">
+          Nombre requerido (mín. 2 caracteres).
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="order">Orden de Visualización</label>
+        <div class="input-with-icon">
+          <i-lucide name="list-ordered" class="icon-sm"></i-lucide>
+          <input type="number" id="order" formControlName="order" min="0">
+        </div>
+        <p class="help-text">Define el orden en que aparecerá esta categoría (0 es primero).</p>
+      </div>
+
+      <div class="form-footer">
+        <button type="button" class="btn-text" (click)="onCancel()" [disabled]="isLoading">Cancelar</button>
+        <button type="submit" class="btn-primary" [disabled]="form.invalid || isLoading">
+          <span *ngIf="!isLoading">{{ category ? 'Guardar Cambios' : 'Crear Categoría' }}</span>
+          <span *ngIf="isLoading">Guardando...</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

@@ -1,0 +1,95 @@
+<div class="clients-container">
+  <header class="clients-header">
+    <div class="header-info">
+      <h1>Cartera de Clientes</h1>
+      <p class="subtitle">Gestiona tu base de datos y fideliza a tus clientes frecuentes.</p>
+    </div>
+    <div class="header-actions">
+      <div class="search-box glass-panel">
+        <i-lucide name="search" class="search-icon"></i-lucide>
+        <input type="text" [(ngModel)]="searchTerm" placeholder="Buscar por nombre o correo...">
+      </div>
+      <button class="btn-primary" (click)="openManualCreate()" [disabled]="isLoading()">
+        <i-lucide *ngIf="!isLoading()" name="user-plus" class="btn-icon"></i-lucide>
+        {{ isLoading() ? 'Cargando...' : 'Nuevo Cliente' }}
+      </button>
+    </div>
+  </header>
+
+  <main class="clients-list-wrapper glass-panel">
+    <div class="table-responsive">
+      <table class="clients-table">
+        <thead>
+          <tr>
+            <th>Nombre y Correo</th>
+            <th>Contacto</th>
+            <th>Citas</th>
+            <th>Total Invertido</th>
+            <th>Última Visita</th>
+            <th class="actions-col"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let client of filteredClients()" (click)="viewClient(client.id)" class="client-row">
+            <td>
+              <div class="client-info">
+                <div class="client-avatar">
+                   {{ client.firstName[0] }}{{ client.lastName[0] }}
+                </div>
+                <div class="name-details">
+                  <span class="client-name">{{ client.firstName }} {{ client.lastName }}</span>
+                  <span class="client-email">{{ client.email }}</span>
+                </div>
+              </div>
+            </td>
+            <td>
+              <div class="contact-actions">
+                <a *ngIf="getWhatsAppLink(client.phone || '')" 
+                   [href]="getWhatsAppLink(client.phone || '')" 
+                   target="_blank" 
+                   (click)="$event.stopPropagation()"
+                   title="WhatsApp">
+                  <i-lucide name="message-circle" class="icon-wa"></i-lucide>
+                </a>
+                <span *ngIf="!client.phone" class="no-phone">No registrado</span>
+                <span *ngIf="client.phone" class="phone-label">{{ client.phone }}</span>
+              </div>
+            </td>
+            <td>
+              <div class="chip">
+                <i-lucide name="calendar" class="icon-xs"></i-lucide>
+                {{ client.appointmentsCount }} 
+              </div>
+            </td>
+            <td>
+              <span class="total-spent">{{ client.totalSpent | currency }}</span>
+            </td>
+            <td>
+              <span class="last-visit" *ngIf="client.lastVisit">
+                {{ client.lastVisit | date: 'dd/MM/yyyy' }}
+              </span>
+              <span class="last-visit-empty" *ngIf="!client.lastVisit">N/A</span>
+            </td>
+            <td class="actions-col">
+               <button class="btn-icon-only">
+                 <i-lucide name="external-link"></i-lucide>
+               </button>
+            </td>
+          </tr>
+
+          <!-- Empty state -->
+          <tr *ngIf="!isLoading() && filteredClients().length === 0">
+            <td colspan="6" class="empty-state">
+              <div class="empty-content">
+                <i-lucide name="user-plus" class="empty-icon"></i-lucide>
+                <p>No se encontraron clientes.</p>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <app-client-modal #clientModal (saved)="loadClients()"></app-client-modal>
+</div>

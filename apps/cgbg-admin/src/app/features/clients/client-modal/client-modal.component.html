@@ -1,0 +1,70 @@
+<div class="modal-overlay" *ngIf="isOpen()" (click)="close()">
+  <div class="modal-panel" (click)="$event.stopPropagation()">
+    <header class="modal-header">
+      <div class="header-title">
+        <i-lucide name="user" class="header-icon"></i-lucide>
+        <h2>Nuevo Cliente Manual</h2>
+      </div>
+      <button class="close-btn" (click)="close()">
+        <i-lucide name="x"></i-lucide>
+      </button>
+    </header>
+
+    <main class="modal-content">
+      <form [formGroup]="clientForm" (ngSubmit)="save()">
+        
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Nombre(s)</label>
+            <input type="text" formControlName="firstName" placeholder="Ej: Maria">
+          </div>
+          <div class="form-group">
+            <label>Apellidos</label>
+            <input type="text" formControlName="lastName" placeholder="Ej: García">
+          </div>
+        </div>
+
+        <div class="form-group full-width">
+          <label>Correo Electrónico (Principal)</label>
+          <div class="input-with-icon">
+            <i-lucide name="mail" class="icon-sm"></i-lucide>
+            <input type="email" formControlName="email" placeholder="cliente@ejemplo.com">
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Teléfono (Opcional)</label>
+            <div class="input-with-icon">
+              <i-lucide name="phone" class="icon-sm"></i-lucide>
+              <input type="text" formControlName="phone" placeholder="55 1234 5678">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Fecha de Nacimiento (Opcional)</label>
+            <div class="input-with-icon">
+              <i-lucide name="calendar" class="icon-sm"></i-lucide>
+              <input type="date" formControlName="birthday">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group full-width">
+          <label>Notas Permanentes / Alergias / Gustos</label>
+          <div class="input-with-icon">
+             <i-lucide name="align-left" class="icon-sm top-align"></i-lucide>
+             <textarea formControlName="notes" placeholder="Ej: Alérgica al tinte X, prefiere agua fría..."></textarea>
+          </div>
+        </div>
+
+        <div class="form-footer">
+          <button type="button" class="btn-secondary" (click)="close()">Cancelar</button>
+          <button type="submit" class="btn-primary" [disabled]="clientForm.invalid || isLoading()">
+            <i-lucide *ngIf="!isLoading()" name="check" class="icon-xs"></i-lucide>
+            {{ isLoading() ? 'Guardando...' : 'Registrar Cliente' }}
+          </button>
+        </div>
+      </form>
+    </main>
+  </div>
+</div>

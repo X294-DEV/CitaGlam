@@ -1,0 +1,16 @@
+<div class="app-shell" [class.collapsed-nav]="navService.isCollapsed()">
+  <app-sidebar></app-sidebar>
+
+  <div class="main-wrapper">
+    <app-topbar></app-topbar>
+
+    <main 
+      class="main-content" 
+      [style.padding-left]="navService.showSidebar() && !navService.isMobile() ? (navService.isCollapsed() ? '70px' : '260px') : '0'"
+    >
+      <div class="content-viewport">
+        <router-outlet></router-outlet>
+      </div>
+    </main>
+  </div>
+</div>

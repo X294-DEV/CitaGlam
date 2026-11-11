@@ -1,0 +1,84 @@
+<div class="modal-backdrop" (click)="onCancel()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <header class="modal-header">
+      <div class="header-text">
+        <h2 class="title">{{ service ? 'Editar Servicio' : 'Nuevo Servicio' }}</h2>
+        <p class="subtitle">Personaliza los detalles de tu oferta.</p>
+      </div>
+      <button class="btn-icon" (click)="onCancel()">
+        <i-lucide name="x"></i-lucide>
+      </button>
+    </header>
+
+    <form [formGroup]="form" (ngSubmit)="onSubmit()" class="modal-body">
+      <div class="alert alert-error" *ngIf="errorMessage()">
+        <i-lucide name="info" class="icon-sm"></i-lucide>
+        <span>{{ errorMessage() }}</span>
+        <button type="button" class="close-alert" (click)="errorMessage.set(null)">×</button>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group flex-2">
+          <label for="name">Nombre del Servicio</label>
+          <input type="text" id="name" formControlName="name" placeholder="Ej: Corte de Cabello Zen">
+          <div *ngIf="form.get('name')?.invalid && form.get('name')?.touched" class="error-text">
+            Nombre requerido (mín. 3 caracteres).
+          </div>
+        </div>
+        <div class="form-group flex-1">
+          <label for="categoryId">Categoría</label>
+          <select id="categoryId" formControlName="categoryId">
+            <option [ngValue]="null">Sin Categoría</option>
+            <option *ngFor="let cat of categories" [ngValue]="cat.id">{{ cat.name }}</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="description">Descripción</label>
+        <textarea id="description" formControlName="description" rows="3" placeholder="Describe los beneficios del servicio..."></textarea>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="price">Precio (MXN)</label>
+          <div class="input-with-icon">
+            <span class="icon-tag">$</span>
+            <input type="number" id="price" formControlName="price" step="0.01">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="durationMin">Duración (min)</label>
+          <div class="input-with-icon">
+            <i-lucide name="info" class="icon-sm"></i-lucide>
+            <input type="number" id="durationMin" formControlName="durationMin" step="5">
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Color en Calendario</label>
+        <div class="color-picker">
+          <button 
+            type="button" 
+            *ngFor="let color of colorPresets" 
+            class="color-option"
+            [style.background-color]="color"
+            [class.active]="form.get('color')?.value === color"
+            (click)="selectColor(color)"
+          >
+            <i-lucide name="check" *ngIf="form.get('color')?.value === color" class="check-icon"></i-lucide>
+          </button>
+        </div>
+      </div>
+
+      <div class="form-footer">
+        <button type="button" class="btn-text" (click)="onCancel()" [disabled]="isLoading">Cancelar</button>
+        <button type="submit" class="btn-primary" [disabled]="form.invalid || isLoading">
+          <span *ngIf="!isLoading">{{ service ? 'Guardar Cambios' : 'Crear Servicio' }}</span>
+          <span *ngIf="isLoading">Guardando...</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

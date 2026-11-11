@@ -1,0 +1,107 @@
+<aside 
+  class="sidebar" 
+  [class.collapsed]="navService.isCollapsed()" 
+  [class.mobile-open]="navService.showSidebar() && navService.isMobile()"
+>
+  <div class="sidebar-header">
+    <div class="logo-area" [class.collapsed]="navService.isCollapsed()">
+      <img src="brand/citaglam-sidebar.png" alt="CitaGlam" class="sidebar-brand-icon">
+    </div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <ng-container *ngIf="!isSuperAdmin()">
+      <a 
+        *ngFor="let item of filteredMenuItems()" 
+        [routerLink]="item.route" 
+        routerLinkActive="active"
+        class="nav-item"
+        [attr.title]="navService.isCollapsed() ? item.label : null"
+      >
+        <i-lucide [name]="item.icon" class="nav-icon"></i-lucide>
+        <span class="nav-label" *ngIf="!navService.isCollapsed()">{{ item.label }}</span>
+      </a>
+    </ng-container>
+
+    <!-- SuperAdmin SaaS Section -->
+    <ng-container *ngIf="isSuperAdmin()">
+      <div class="nav-separator" *ngIf="!navService.isCollapsed()">
+        <span>SaaS Global</span>
+        <span class="role-indicator">{{ authService.currentUser()?.role || 'Súper Admin' }}</span>
+      </div>
+      <div class="nav-separator-mini" *ngIf="navService.isCollapsed()"></div>
+      
+      <a 
+        *ngFor="let item of saasItems" 
+        [routerLink]="item.route" 
+        routerLinkActive="active"
+        class="nav-item saas-item"
+        [attr.title]="navService.isCollapsed() ? item.label : null"
+      >
+        <i-lucide [name]="item.icon" class="nav-icon"></i-lucide>
+        <span class="nav-label" *ngIf="!navService.isCollapsed()">{{ item.label }}</span>
+      </a>
+
+      <!-- Config Dropdown -->
+      <div class="dropdown-container" [class.open]="isConfigOpen()">
+        <button 
+          class="nav-item saas-item dropdown-trigger" 
+          (click)="toggleConfig()"
+          [class.active]="router.url.includes('/saas/config')"
+          [attr.title]="navService.isCollapsed() ? 'Configuración' : null"
+        >
+          <div class="trigger-main">
+            <i-lucide name="settings" class="nav-icon"></i-lucide>
+            <span class="nav-label" *ngIf="!navService.isCollapsed()">Configuración</span>
+          </div>
+          <i-lucide 
+            [name]="isConfigOpen() ? 'chevron-up' : 'chevron-down'" 
+            class="chevron-icon"
+            *ngIf="!navService.isCollapsed()"
+          ></i-lucide>
+        </button>
+
+        <div class="dropdown-content" *ngIf="isConfigOpen() && !navService.isCollapsed()">
+          <a 
+            *ngFor="let sub of configSubItems" 
+            [routerLink]="sub.route" 
+            routerLinkActive="active"
+            class="nav-item saas-item sub-item"
+          >
+            <i-lucide [name]="sub.icon" class="nav-icon-sm"></i-lucide>
+            <span class="nav-label">{{ sub.label }}</span>
+          </a>
+        </div>
+      </div>
+    </ng-container>
+  </nav>
+
+  <div class="sidebar-footer">
+    <!-- PWA Installation -->
+    <ng-container *ngIf="pwaService.showInstallButton()">
+      <button class="nav-item install-btn" (click)="pwaService.install()" [attr.title]="navService.isCollapsed() ? 'Instalar App' : null">
+        <i-lucide name="download" class="nav-icon"></i-lucide>
+        <span class="nav-label" *ngIf="!navService.isCollapsed()">Instalar Aplicación</span>
+      </button>
+    </ng-container>
+
+    <!-- iOS Hint (Conditional: Only if iOS, NOT installed, and IS mobile) -->
+    <div class="pwa-ios-hint" *ngIf="pwaService.isIos() && !pwaService.isInstalled() && pwaService.isMobile() && !navService.isCollapsed()">
+      <span>Añade a inicio vía</span>
+      <i-lucide name="share" class="hint-icon-inline"></i-lucide>
+    </div>
+
+    <!-- Logout or Bottom Actions -->
+    <button class="nav-item logout-btn" (click)="toggleCollapse()" title="Colapsar menú">
+      <i-lucide name="chevron-left" class="nav-icon" *ngIf="!navService.isCollapsed()"></i-lucide>
+      <i-lucide name="chevron-right" class="nav-icon" *ngIf="navService.isCollapsed()"></i-lucide>
+      <span class="nav-label" *ngIf="!navService.isCollapsed()">Contraer</span>
+    </button>
+  </div>
+</aside>
+
+<div 
+  class="sidebar-overlay" 
+  *ngIf="navService.showSidebar() && navService.isMobile()" 
+  (click)="navService.toggleSidebar()"
+></div>

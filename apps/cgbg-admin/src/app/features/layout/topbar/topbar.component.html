@@ -1,0 +1,105 @@
+<header 
+  class="topbar" 
+  [style.left]="navService.showSidebar() && !navService.isMobile() ? (navService.isCollapsed() ? '70px' : '260px') : '0'"
+>
+  <div class="topbar-left">
+    <button class="icon-btn mobile-only" (click)="toggleSidebar()">
+      <i-lucide name="menu"></i-lucide>
+    </button>
+    
+    <div class="breadcrumb" *ngIf="!navService.isMobile()">
+      <span class="breadcrumb-item active">Dashboard</span>
+    </div>
+  </div>
+
+  <div class="topbar-right">
+    <div class="top-action-container">
+      <button class="icon-btn" (click)="toggleNotifications()" [class.active]="showNotifications()">
+        <i-lucide name="bell" class="icon-sm"></i-lucide>
+        <span class="badge" *ngIf="notificationService.unreadCount() > 0">
+          {{ notificationService.unreadCount() }}
+        </span>
+      </button>
+      
+      <div class="dropdown-panel notifications-panel glass-panel" *ngIf="showNotifications()">
+        <div class="dropdown-header">
+          <span>Notificaciones</span>
+          <button 
+            *ngIf="notificationService.unreadCount() > 0"
+            class="text-btn xs" 
+            (click)="notificationService.markAllAsRead()"
+          >
+            Marcar todas como leídas
+          </button>
+        </div>
+        
+        <div class="dropdown-content" [class.empty]="notificationService.notifications().length === 0">
+          <div *ngIf="notificationService.notifications().length > 0">
+            <div 
+              *ngFor="let n of notificationService.notifications().slice(0, 8)" 
+              class="notification-item"
+              [class.unread]="!n.isRead"
+              (click)="handleNotificationClick(n)"
+            >
+              <div class="notif-icon" [ngClass]="n.type.toLowerCase()">
+                <i-lucide [name]="n.type === 'SUCCESS' ? 'check-circle' : 'info'" class="icon-xs"></i-lucide>
+              </div>
+              <div class="notif-body">
+                <span class="notif-title">{{ n.title }}</span>
+                <p class="notif-message">{{ n.message }}</p>
+                <div class="notif-meta">
+                  <span>{{ n.createdAt | date:'short' }}</span>
+                  <i-lucide *ngIf="n.actionType === 'EXTERNAL_LINK'" name="external-link" class="icon-xxs"></i-lucide>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="empty-state" *ngIf="notificationService.notifications().length === 0">
+            <i-lucide name="bell-off" class="empty-icon"></i-lucide>
+            <p>No hay notificaciones</p>
+          </div>
+        </div>
+
+        <div class="dropdown-footer" *ngIf="notificationService.notifications().length > 0">
+           <button class="btn-view-all" (click)="goToAllNotifications()">
+              <i-lucide name="clock" class="icon-xs"></i-lucide>
+              Ver todo el historial
+           </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="user-profile" (click)="toggleUserMenu()" [class.active]="showUserMenu()">
+      <div class="user-avatar-circle">
+        {{ getUserInitials() }}
+      </div>
+      <div class="user-info" *ngIf="!navService.isMobile()">
+        <span class="user-name">{{ authService.currentUser()?.firstName || 'Administrador' }}</span>
+      </div>
+      <i-lucide name="chevron-down" class="icon-xs"></i-lucide>
+
+      <div class="dropdown-panel user-menu-panel glass-panel" *ngIf="showUserMenu()">
+        <!-- User Info Header -->
+        <div class="user-menu-header">
+           <div class="header-avatar">
+              {{ getUserInitials() }}
+           </div>
+           <div class="header-details">
+              <span class="full-name">{{ authService.currentUser()?.firstName }} {{ authService.currentUser()?.lastName || '' }}</span>
+              <span class="role-badge">{{ authService.currentUser()?.role || 'Súper Admin' }}</span>
+           </div>
+        </div>
+        
+        <div class="menu-divider"></div>
+
+        <div class="dropdown-content">
+          <button class="dropdown-item logout" (click)="logout()">
+            <i-lucide name="log-out" class="icon-sm"></i-lucide>
+            <span>Cerrar Sesión</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>

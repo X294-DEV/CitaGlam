@@ -1,0 +1,276 @@
+<section class="appointments-page">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Gestión operativa</p>
+      <h1>Citas</h1>
+      <p class="subtitle">Consulta las reservas del negocio sin mezclarlas con la vista de calendario.</p>
+    </div>
+
+    <button class="refresh-btn" type="button" (click)="loadAppointments()">
+      Actualizar
+    </button>
+  </header>
+
+  <div *ngIf="isLoading()" class="state-card">Cargando citas...</div>
+  <div *ngIf="errorMessage()" class="state-card error">{{ errorMessage() }}</div>
+  <div *ngIf="successMessage()" class="state-card success">{{ successMessage() }}</div>
+
+  <section *ngIf="!isLoading() && pendingApproval().length > 0" class="approval-panel">
+    <div class="approval-header">
+      <div>
+        <p class="eyebrow">Pagos manuales</p>
+        <h2>Comprobantes por validar</h2>
+      </div>
+      <span class="approval-count">{{ pendingApproval().length }}</span>
+    </div>
+
+    <div class="approval-grid">
+      <article *ngFor="let appointment of pendingApproval()" class="approval-card">
+        <div>
+          <span class="status-pill" [attr.data-status]="appointment.status">
+            {{ statusLabel(appointment.status) }}
+          </span>
+          <h3>{{ appointment.service?.name }}</h3>
+          <p class="approval-client">
+            {{ appointment.client?.firstName }} {{ appointment.client?.lastName }}
+            <span>{{ appointment.client?.email }}</span>
+          </p>
+        </div>
+
+        <dl>
+          <div>
+            <dt>Fecha</dt>
+            <dd>{{ formatDateTime(appointment.startTime) }}</dd>
+          </div>
+          <div>
+            <dt>Monto</dt>
+            <dd>{{ paymentAmount(appointment) | currency:'MXN':'symbol':'1.2-2' }}</dd>
+          </div>
+          <div>
+            <dt>Sucursal</dt>
+            <dd>{{ appointment.branch?.name || '-' }}</dd>
+          </div>
+        </dl>
+
+        <div class="approval-actions">
+          <a *ngIf="receiptUrl(appointment); else noReceipt"
+             class="receipt-link"
+             [href]="receiptUrl(appointment)!"
+             target="_blank"
+             rel="noopener">
+            Ver comprobante
+          </a>
+
+          <ng-template #noReceipt>
+            <span class="missing-receipt">Sin comprobante adjunto</span>
+          </ng-template>
+
+          <button class="btn-reject"
+                  type="button"
+                  [disabled]="actionLoadingId() === appointment.id"
+                  (click)="rejectPayment(appointment)">
+            Rechazar
+          </button>
+          <button class="btn-approve"
+                  type="button"
+                  [disabled]="actionLoadingId() === appointment.id || !receiptUrl(appointment)"
+                  (click)="approvePayment(appointment)">
+            {{ actionLoadingId() === appointment.id ? 'Procesando...' : 'Confirmar pago' }}
+          </button>
+          <button class="btn-secondary-action"
+                  type="button"
+                  (click)="selectAppointment(appointment)">
+            Ver detalles
+          </button>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section *ngIf="selectedAppointment() as selected" class="details-panel">
+    <header class="details-header">
+      <div>
+        <p class="eyebrow">Detalle de cita</p>
+        <h2>{{ selected.service?.name || 'Servicio' }}</h2>
+        <p>{{ selected.client?.firstName }} {{ selected.client?.lastName }} · {{ selected.client?.email }}</p>
+      </div>
+
+      <button class="close-details" type="button" (click)="closeDetails()">Cerrar</button>
+    </header>
+
+    <div class="details-grid">
+      <div class="detail-item">
+        <span>Fecha y hora</span>
+        <strong>{{ formatDateTime(selected.startTime) }}</strong>
+      </div>
+      <div class="detail-item">
+        <span>Estado</span>
+        <strong>{{ statusLabel(selected.status) }}</strong>
+      </div>
+      <div class="detail-item">
+        <span>Sucursal</span>
+        <strong>{{ selected.branch?.name || '-' }}</strong>
+      </div>
+      <div class="detail-item">
+        <span>Monto</span>
+        <strong>{{ paymentAmount(selected) | currency:'MXN':'symbol':'1.2-2' }}</strong>
+      </div>
+      <div class="detail-item">
+        <span>Pago aprobado</span>
+        <strong>{{ selected.payment?.isApproved ? 'Sí' : 'No' }}</strong>
+      </div>
+      <div class="detail-item">
+        <span>Comprobante</span>
+        <strong>
+          <a *ngIf="receiptUrl(selected); else noDetailReceipt"
+             class="table-link"
+             [href]="receiptUrl(selected)!"
+             target="_blank"
+             rel="noopener">
+            Abrir comprobante
+          </a>
+          <ng-template #noDetailReceipt>-</ng-template>
+        </strong>
+      </div>
+    </div>
+
+    <div *ngIf="selected.notes" class="notes-box">
+      <span>Notas</span>
+      <p>{{ selected.notes }}</p>
+    </div>
+
+    <div class="details-actions">
+      <button *ngIf="selected.status === 'WAITING_APPROVAL'"
+              class="btn-approve"
+              type="button"
+              [disabled]="actionLoadingId() === selected.id || !receiptUrl(selected)"
+              (click)="approvePayment(selected)">
+        Confirmar pago
+      </button>
+      <button *ngIf="selected.status === 'WAITING_APPROVAL'"
+              class="btn-reject"
+              type="button"
+              [disabled]="actionLoadingId() === selected.id"
+              (click)="rejectPayment(selected)">
+        Rechazar comprobante
+      </button>
+      <button *ngIf="canCancel(selected)"
+              class="btn-reject"
+              type="button"
+              [disabled]="actionLoadingId() === selected.id"
+              (click)="cancelAppointment(selected)">
+        Cancelar cita
+      </button>
+      <button *ngIf="canReschedule(selected)"
+              class="btn-secondary-action"
+              type="button"
+              [disabled]="actionLoadingId() === selected.id"
+              (click)="rescheduleAppointment(selected)">
+        Reprogramar
+      </button>
+      <button *ngIf="canComplete(selected)"
+              class="btn-secondary-action"
+              type="button"
+              [disabled]="actionLoadingId() === selected.id"
+              (click)="completeAppointment(selected)">
+        Marcar completada
+      </button>
+    </div>
+  </section>
+
+  <div *ngIf="!isLoading() && !errorMessage()" class="appointments-card">
+    <table *ngIf="sortedAppointments().length > 0; else emptyState">
+      <thead>
+        <tr>
+          <th>Fecha y hora</th>
+          <th>Cliente</th>
+          <th>Servicio</th>
+          <th>Sucursal</th>
+          <th>Estado</th>
+          <th>Monto</th>
+          <th>Comprobante</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let appointment of sortedAppointments()">
+          <td class="date-cell">{{ formatDateTime(appointment.startTime) }}</td>
+          <td>
+            <strong>{{ appointment.client?.firstName }} {{ appointment.client?.lastName }}</strong>
+            <span>{{ appointment.client?.email }}</span>
+          </td>
+          <td>{{ appointment.service?.name }}</td>
+          <td>{{ appointment.branch?.name || '-' }}</td>
+          <td>
+            <span class="status-pill" [attr.data-status]="appointment.status">
+              {{ statusLabel(appointment.status) }}
+            </span>
+          </td>
+          <td>{{ paymentAmount(appointment) | currency:'MXN':'symbol':'1.2-2' }}</td>
+          <td>
+            <a *ngIf="receiptUrl(appointment)"
+               class="table-link"
+               [href]="receiptUrl(appointment)!"
+               target="_blank"
+               rel="noopener">
+              Abrir
+            </a>
+            <span *ngIf="!receiptUrl(appointment)">-</span>
+          </td>
+          <td>
+            <div class="actions-menu" (click)="$event.stopPropagation()">
+              <button class="actions-trigger"
+                      type="button"
+                      title="Acciones"
+                      [attr.aria-expanded]="openActionMenuId() === appointment.id"
+                      [disabled]="actionLoadingId() === appointment.id"
+                      (click)="toggleActionMenu(appointment.id)">
+                ⋮
+              </button>
+
+              <div *ngIf="openActionMenuId() === appointment.id" class="actions-dropdown">
+                <button type="button" (click)="selectAppointment(appointment)">
+                  Ver detalles
+                </button>
+                <button *ngIf="canReschedule(appointment)"
+                        type="button"
+                        (click)="rescheduleAppointment(appointment)">
+                  Reprogramar
+                </button>
+                <button *ngIf="canConfirmPayment(appointment)"
+                        type="button"
+                        [disabled]="!receiptUrl(appointment)"
+                        (click)="approvePayment(appointment)">
+                  Confirmar pago
+                </button>
+                <button *ngIf="canConfirmPayment(appointment)"
+                        type="button"
+                        (click)="rejectPayment(appointment)">
+                  Rechazar comprobante
+                </button>
+                <button *ngIf="canComplete(appointment)"
+                        type="button"
+                        (click)="completeAppointment(appointment)">
+                  Marcar completada
+                </button>
+                <button *ngIf="canCancel(appointment)"
+                        type="button"
+                        class="danger-action"
+                        (click)="cancelAppointment(appointment)">
+                  Cancelar cita
+                </button>
+              </div>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <ng-template #emptyState>
+      <div class="empty-state">
+        <h2>No hay citas todavía</h2>
+        <p>Cuando se creen reservas desde la página pública o el calendario, aparecerán aquí.</p>
+      </div>
+    </ng-template>
+  </div>
+</section>

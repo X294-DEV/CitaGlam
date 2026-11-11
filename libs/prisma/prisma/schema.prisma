@@ -1,0 +1,372 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model SubscriptionPackage {
+  id                   String                @id @default(uuid())
+  name                 String                @unique
+  description          String?
+  price                Decimal               @db.Decimal(10, 2)
+  interval             String                @default("monthly")
+  pricesByTerm         Json?
+  trialDays            Int                   @default(0)
+  isActive             Boolean               @default(true)
+  isPublic             Boolean               @default(true)
+  limits               Json?
+  features             Json?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  subscriptionPayments SubscriptionPayment[]
+  tenants              Tenant[]
+}
+
+model Promotion {
+  id          String                @id @default(uuid())
+  code        String                @unique
+  description String?
+  type        PromotionType         @default(PERCENTAGE)
+  value       Decimal               @db.Decimal(10, 2)
+  validUntil  DateTime?
+  maxUses     Int?
+  usedCount   Int                   @default(0)
+  isActive    Boolean               @default(true)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  payments    SubscriptionPayment[]
+}
+
+model Tenant {
+  id                    String                @id @default(uuid())
+  slug                  String                @unique
+  name                  String
+  logoUrl               String?
+  isActive              Boolean               @default(true)
+  subscriptionExpiresAt DateTime?
+  lastPaymentAt         DateTime?
+  packageId             String
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  appointments          Appointment[]
+  branches              Branch[]
+  services              Service[]
+  serviceCategories     ServiceCategory[]
+  subscriptionPayments  SubscriptionPayment[]
+  package               SubscriptionPackage   @relation(fields: [packageId], references: [id])
+  config                TenantConfig?
+  users                 User[]
+}
+
+model SubscriptionPayment {
+  id          String              @id @default(uuid())
+  tenantId    String
+  packageId   String
+  promotionId String?
+  amount      Decimal             @db.Decimal(10, 2)
+  monthsCount Int
+  status      PaymentStatus       @default(PENDING)
+  evidenceUrl String?
+  adminNotes  String?
+  approvedAt  DateTime?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  package     SubscriptionPackage @relation(fields: [packageId], references: [id])
+  promotion   Promotion?          @relation(fields: [promotionId], references: [id])
+  tenant      Tenant              @relation(fields: [tenantId], references: [id])
+}
+
+model GlobalConfig {
+  id              String   @id @default("SYSTEM")
+  gracePeriodDays Int      @default(3)
+  reminderHours   Int      @default(24)
+  bankDetails     Json?
+  branding        Json?
+  emailConfig     Json?
+  emailTemplates  Json?
+  seo             Json?
+  legal           Json?
+  localization    Json?
+  security        Json?
+  maintenanceMode Boolean  @default(false)
+  updatedAt       DateTime @updatedAt
+}
+
+model SaaSExpense {
+  id          String   @id @default(uuid())
+  name        String
+  category    String
+  monthlyCost Decimal  @db.Decimal(10, 2)
+  dueDay      Int?
+  description String?
+  isActive    Boolean  @default(true)
+  startDate   DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model TenantConfig {
+  id               String  @id @default(uuid())
+  tenantId         String  @unique
+  primaryColor     String  @default("#3B82F6")
+  secondaryColor   String?
+  welcomeMessage   String?
+  businessCategory String?
+  customSettings   Json?
+  tenant           Tenant  @relation(fields: [tenantId], references: [id])
+}
+
+model User {
+  id                   String         @id @default(uuid())
+  email                String         @unique
+  password             String?
+  firstName            String
+  lastName             String
+  role                 Role           @default(CLIENT)
+  isActive             Boolean        @default(false)
+  activationToken      String?        @unique
+  resetPasswordToken   String?        @unique
+  resetPasswordExpires DateTime?
+  activationExpires    DateTime?
+  tenantId             String?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  appointments         Appointment[]
+  profile              Profile?
+  refreshTokens        RefreshToken[]
+  tenant               Tenant?        @relation(fields: [tenantId], references: [id])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Profile {
+  id        String  @id @default(uuid())
+  userId    String  @unique
+  phone     String?
+  avatarUrl String?
+  address   String?
+  bio       String?
+  user      User    @relation(fields: [userId], references: [id])
+}
+
+model Branch {
+  id           String             @id @default(uuid())
+  tenantId     String
+  name         String
+  address      String
+  city         String?
+  phone        String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  appointments Appointment[]
+  tenant       Tenant             @relation(fields: [tenantId], references: [id])
+  schedules    BusinessSchedule[]
+}
+
+model Service {
+  id           String           @id @default(uuid())
+  tenantId     String
+  name         String
+  description  String?
+  durationMin  Int              @default(30)
+  price        Decimal          @db.Decimal(10, 2)
+  imageUrl     String?
+  color        String?
+  isActive     Boolean          @default(true)
+  categoryId   String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  appointments Appointment[]
+  category     ServiceCategory? @relation(fields: [categoryId], references: [id])
+  tenant       Tenant           @relation(fields: [tenantId], references: [id])
+}
+
+model ServiceCategory {
+  id        String    @id @default(uuid())
+  tenantId  String
+  name      String
+  order     Int       @default(0)
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  services  Service[]
+  tenant    Tenant    @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, name])
+}
+
+model Appointment {
+  id        String            @id @default(uuid())
+  tenantId  String
+  clientId  String
+  branchId  String
+  serviceId String
+  startTime DateTime
+  endTime   DateTime
+  paymentExpiry DateTime?
+  status    AppointmentStatus @default(PENDING_PAYMENT)
+  notes     String?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  branch    Branch            @relation(fields: [branchId], references: [id])
+  client    User              @relation(fields: [clientId], references: [id])
+  service   Service           @relation(fields: [serviceId], references: [id])
+  tenant    Tenant            @relation(fields: [tenantId], references: [id])
+  payment   Payment?
+  reviews   Review[]
+}
+
+model Payment {
+  id            String            @id @default(uuid())
+  appointmentId String            @unique
+  amount        Decimal           @db.Decimal(10, 2)
+  method        PaymentMethodType
+  receiptUrl    String?
+  isApproved    Boolean           @default(false)
+  approvedAt    DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  appointment   Appointment       @relation(fields: [appointmentId], references: [id])
+}
+
+model Review {
+  id            String      @id @default(uuid())
+  appointmentId String
+  rating        Int         @default(5)
+  comment       String?
+  createdAt     DateTime    @default(now())
+  appointment   Appointment @relation(fields: [appointmentId], references: [id])
+}
+
+model BusinessSchedule {
+  id         String  @id @default(uuid())
+  branchId   String
+  dayOfWeek  Int
+  openTime   String
+  closeTime  String
+  openTime2  String?
+  closeTime2 String?
+  isOpen     Boolean @default(true)
+  branch     Branch  @relation(fields: [branchId], references: [id])
+
+  @@unique([dayOfWeek, branchId])
+}
+
+model WorkException {
+  id            String   @id @default(uuid())
+  tenantId      String
+  exceptionDate DateTime
+  reason        String?
+  isFullDay     Boolean  @default(true)
+  startTime     String?
+  endTime       String?
+  createdAt     DateTime @default(now())
+}
+
+model BusinessRequest {
+  id                String                 @id @default(uuid())
+  fullName          String
+  email             String
+  businessName      String
+  phone             String
+  selectedPackageId String?
+  monthsCount       Int?
+  negotiatedPrice   Decimal?               @db.Decimal(10, 2)
+  status            BusinessRequestStatus  @default(PENDING)
+  evidenceUrl       String?
+  adminNotes        String?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  proofs            BusinessRequestProof[]
+}
+
+model BusinessRequestProof {
+  id                String          @id @default(uuid())
+  businessRequestId String
+  evidenceUrl       String
+  adminNotes        String?
+  status            String          @default("WAITING")
+  createdAt         DateTime        @default(now())
+  businessRequest   BusinessRequest @relation(fields: [businessRequestId], references: [id])
+}
+
+model Notification {
+  id         String                 @id @default(uuid())
+  userId     String
+  tenantId   String?
+  title      String
+  message    String
+  type       NotificationType       @default(INFO)
+  actionUrl  String?
+  actionType NotificationActionType @default(NONE)
+  isRead     Boolean                @default(false)
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
+
+  @@index([userId])
+  @@index([tenantId])
+}
+
+enum Role {
+  SUPERADMIN
+  ADMIN
+  STAFF
+  CLIENT
+}
+
+enum AppointmentStatus {
+  PENDING_PAYMENT
+  WAITING_APPROVAL
+  AUTHORIZED
+  COMPLETED
+  CANCELLED
+}
+
+enum BusinessRequestStatus {
+  PENDING
+  PROPOSAL_SENT
+  WAITING_APPROVAL
+  APPROVED
+  REJECTED
+}
+
+enum PaymentMethodType {
+  CASH
+  TRANSFER
+  CARD_ONLINE
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+}
+
+enum NotificationActionType {
+  NONE
+  INTERNAL_NAV
+  EXTERNAL_LINK
+}
+
+enum PromotionType {
+  PERCENTAGE
+  FIXED_AMOUNT
+}
+
+enum PaymentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}

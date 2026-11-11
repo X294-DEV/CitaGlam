@@ -1,0 +1,132 @@
+<div class="calendar-container">
+  <header class="calendar-header">
+    <div class="header-left">
+      <h1 class="title">Agenda Maestro</h1>
+      <div class="nav-controls">
+        <button class="nav-btn" (click)="prev()" title="Anterior">
+          <i-lucide name="chevron-left"></i-lucide>
+        </button>
+        <button class="today-btn" (click)="today()">Hoy</button>
+        <button class="nav-btn" (click)="next()" title="Siguiente">
+          <i-lucide name="chevron-right"></i-lucide>
+        </button>
+      </div>
+      <span class="date-label">{{ dateLabel() }}</span>
+    </div>
+
+    <div class="header-right">
+      <div class="view-selector">
+        <button [class.active]="view() === 'day'" (click)="setView('day')">Día</button>
+        <button [class.active]="view() === 'week'" (click)="setView('week')">Semana</button>
+        <button [class.active]="view() === 'month'" (click)="setView('month')">Mes</button>
+      </div>
+      <button class="btn-primary" (click)="onNewAppointmentClick()">
+        <i-lucide name="plus" class="btn-icon"></i-lucide>
+        Nueva Cita
+      </button>
+    </div>
+  </header>
+
+  <main class="calendar-grid-wrapper glass-panel" [attr.data-view]="view()">
+    <ng-container *ngIf="view() !== 'month'; else monthView">
+      <div
+        class="week-days-row"
+        [style.grid-template-columns]="'80px repeat(' + visibleDays().length + ', minmax(180px, 1fr))'"
+      >
+        <div class="time-column-header"></div>
+        <div *ngFor="let day of visibleDays()" class="day-header" [class.is-today]="day.isToday">
+          <span class="day-label">{{ day.label }}</span>
+        </div>
+      </div>
+
+      <div class="calendar-scroller">
+        <div
+          class="calendar-grid"
+          [style.grid-template-columns]="'80px minmax(' + (visibleDays().length * 180) + 'px, 1fr)'"
+        >
+          <div class="time-column">
+            <div *ngFor="let hour of hours" class="hour-marker">
+              {{ hour }}:00
+            </div>
+          </div>
+
+          <div
+            class="days-columns"
+            [style.grid-template-columns]="'repeat(' + visibleDays().length + ', minmax(180px, 1fr))'"
+          >
+            <div *ngFor="let day of visibleDays()" class="day-column">
+              <div
+                *ngFor="let hour of hours"
+                class="time-cell"
+                (click)="onCellClick(day.date, hour)"
+              >
+                <div
+                  *ngFor="let app of getAppointmentsForDayAndHour(day.date, hour)"
+                  class="appointment-card"
+                  [style.border-left-color]="app.service?.color || '#4A8E8A'"
+                  (click)="onAppointmentClick(app); $event.stopPropagation()"
+                >
+                  <span class="app-time">{{ formatAppointmentHour(app) }}</span>
+                  <span class="app-service">{{ app.service?.name }}</span>
+                  <span class="app-client">{{ app.client?.firstName }} {{ app.client?.lastName }}</span>
+
+                  <div class="status-indicator" [attr.data-status]="app.status">
+                    <i-lucide
+                      *ngIf="app.status === 'PENDING_PAYMENT' || app.status === 'WAITING_APPROVAL'"
+                      name="clock"
+                      class="status-icon"
+                    ></i-lucide>
+                    <i-lucide
+                      *ngIf="app.status === 'AUTHORIZED' || app.status === 'COMPLETED'"
+                      name="check-circle"
+                      class="status-icon"
+                    ></i-lucide>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </ng-container>
+
+    <ng-template #monthView>
+      <div class="month-weekdays-row">
+        <span>Lun</span>
+        <span>Mar</span>
+        <span>Mié</span>
+        <span>Jue</span>
+        <span>Vie</span>
+        <span>Sáb</span>
+        <span>Dom</span>
+      </div>
+
+      <div class="month-grid">
+        <div
+          *ngFor="let day of visibleDays()"
+          class="month-day"
+          [class.is-today]="day.isToday"
+          [class.outside-month]="!day.isCurrentMonth"
+          (click)="onCellClick(day.date, 9)"
+        >
+          <div class="month-day-number">{{ day.dayNumber }}</div>
+
+          <div class="month-appointments">
+            <button
+              *ngFor="let app of getAppointmentsForDay(day.date)"
+              type="button"
+              class="month-appointment"
+              [style.border-left-color]="app.service?.color || '#4A8E8A'"
+              (click)="onAppointmentClick(app); $event.stopPropagation()"
+            >
+              <span>{{ formatAppointmentHour(app) }}</span>
+              {{ app.service?.name || 'Cita' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </ng-template>
+  </main>
+
+  <app-appointment-modal #appointmentModal (appointmentSaved)="loadAppointments()"></app-appointment-modal>
+</div>

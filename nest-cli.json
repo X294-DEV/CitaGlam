@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json.schemastore.org/nest-cli",
+  "collection": "@nestjs/schematics",
+  "sourceRoot": "apps/cgbg-backend/src",
+  "projects": {
+    "cgbg-backend": {
+      "type": "application",
+      "root": "apps/cgbg-backend",
+      "entryFile": "main",
+      "sourceRoot": "apps/cgbg-backend/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/cgbg-backend/tsconfig.json"
+      }
+    }
+  }
+}

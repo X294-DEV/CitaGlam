@@ -1,0 +1,252 @@
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+}
+
+.modal-content {
+  background: #FFFFFF;
+  width: 100%;
+  max-width: 650px;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.15);
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  padding: 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #F5F5F5;
+}
+
+.modal-header .title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.8rem;
+  font-weight: 600;
+  color: #2D4A47;
+}
+
+.modal-header .subtitle {
+  color: #888;
+  font-size: 0.9rem;
+}
+
+.modal-body {
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* --- Alerts --- */
+.alert {
+  padding: 12px 16px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  position: relative;
+  animation: fadeIn 0.3s ease;
+}
+
+.alert-error {
+  background: #FFF1F1;
+  border: 1px solid #FFEBEB;
+  color: #D32F2F;
+}
+
+.alert i-lucide {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+}
+
+.close-alert {
+  margin-left: auto;
+  background: none;
+  border: none;
+  font-size: 1.4rem;
+  color: currentColor;
+  opacity: 0.5;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.close-alert:hover {
+  opacity: 1;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Form Utils --- */
+.form-row {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.flex-2 { flex: 2; }
+.flex-1 { flex: 1; }
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.form-group label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #555;
+  margin-left: 4px;
+}
+
+.form-group input, .form-group textarea, .form-group select {
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid #EAEAEA;
+  background-color: #FAFAFA;
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+}
+
+.form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+  outline: none;
+  border-color: #4A8E8A;
+  background-color: white;
+  box-shadow: 0 0 0 4px rgba(74, 142, 138, 0.05);
+}
+
+.input-with-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.icon-tag, .icon-sm {
+  position: absolute;
+  left: 14px;
+  color: #AAA;
+}
+
+.input-with-icon input {
+  padding-left: 40px;
+  width: 100%;
+}
+
+.error-text {
+  color: #E57373;
+  font-size: 0.75rem;
+  margin-left: 4px;
+}
+
+/* --- Color Picker --- */
+.color-picker {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.color-option {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  transition: transform 0.2s;
+  padding: 0;
+}
+
+.color-option:hover {
+  transform: scale(1.15);
+}
+
+.color-option.active {
+  box-shadow: 0 0 0 3px rgba(74, 142, 138, 0.3);
+}
+
+.check-icon {
+  width: 16px;
+  height: 16px;
+  color: white;
+}
+
+/* --- Footer --- */
+.form-footer {
+  margin-top: 2rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+.btn-icon {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #AAA;
+  border-radius: 50%;
+  padding: 8px;
+}
+
+.btn-icon:hover {
+  background: #F5F5F5;
+  color: #4A8E8A;
+}
+
+.btn-text {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #888;
+  font-weight: 500;
+}
+
+.btn-primary {
+  padding: 14px 28px;
+  border-radius: 12px;
+  background: #4A8E8A;
+  color: white;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary:active {
+  transform: scale(0.98);
+}
+
+.btn-primary:disabled {
+  background: #AECAC8;
+  cursor: not-allowed;
+}
+
+/* --- Responsive --- */
+@media (max-width: 600px) {
+  .form-row { flex-direction: column; gap: 1.5rem; }
+  .modal-header, .modal-body { padding: 24px; }
+}

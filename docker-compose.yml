@@ -1,0 +1,142 @@
+
+services:
+  # 1. Base de Datos PostgreSQL
+  cgbg-db:
+    image: postgres:16-alpine
+    container_name: cgbg-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}
+      POSTGRES_DB: ${POSTGRES_DB:-cgbg_bd}
+    ports:
+      - "5433:5432"
+    volumes:
+      - cgbg-db-data:/var/lib/postgresql/data
+    networks:
+      - cgbg-network
+    restart: always
+
+  # 2. Caché Redis
+  cgbg-redis:
+    image: redis:7-alpine
+    container_name: cgbg-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - cgbg-network
+    restart: always
+
+  # 3. Mensajería RabbitMQ
+  cgbg-mq:
+    image: rabbitmq:3-management-alpine
+    container_name: cgbg-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-guest}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - cgbg-network
+    restart: always
+
+  # 4. Backend NestJS
+  cgbg-backend:
+    image: cgbg-dev:local
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dev
+    container_name: cgbg-backend
+    working_dir: /workspaces/cgbg
+    env_file: .env
+    ports:
+      - "3001:3001"
+    volumes:
+      - .:/workspaces/cgbg
+      - cgbg-node-modules:/workspaces/cgbg/node_modules
+    depends_on:
+      cgbg-db:
+        condition: service_started
+      cgbg-redis:
+        condition: service_started
+      cgbg-mq:
+        condition: service_started
+    command: >
+      sh -c "npx prisma generate --schema=libs/prisma/prisma/schema.prisma &&
+             rm -rf dist apps/cgbg-backend/dist &&
+             npx ts-node -r tsconfig-paths/register apps/cgbg-backend/src/main.ts"
+    networks:
+      - cgbg-network
+
+  # 5. Admin Frontend (Angular)
+  cgbg-admin:
+    image: cgbg-dev:local
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dev
+    container_name: cgbg-admin
+    working_dir: /workspaces/cgbg/apps/cgbg-admin
+    env_file: .env
+    ports:
+      - "4200:4200"
+    volumes:
+      - .:/workspaces/cgbg
+      - cgbg-node-modules:/workspaces/cgbg/node_modules
+    depends_on:
+      - cgbg-backend
+    command: >
+      sh -c "while [ ! -f /workspaces/cgbg/node_modules/.bin/ng ]; do sleep 5; done; 
+             ng serve --host 0.0.0.0 --port 4200 --poll 2000"
+    networks:
+      - cgbg-network
+
+  # 6. Client Frontend (Next.js)
+  cgbg-client:
+    image: cgbg-dev:local
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dev
+    container_name: cgbg-client
+    working_dir: /workspaces/cgbg/apps/cgbg-client
+    env_file: .env
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/workspaces/cgbg
+      - cgbg-node-modules:/workspaces/cgbg/node_modules
+    depends_on:
+      - cgbg-backend
+    command: >
+      sh -c "while [ ! -f /workspaces/cgbg/node_modules/.bin/next ]; do sleep 5; done;
+             npm run dev -- --hostname 0.0.0.0 --port 3000"
+    networks:
+      - cgbg-network
+
+  # 7. Background Worker (NestJS)
+  cgbg-worker:
+    image: cgbg-dev:local
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dev
+    container_name: cgbg-worker
+    working_dir: /workspaces/cgbg/apps/cgbg-worker
+    env_file: .env
+    volumes:
+      - .:/workspaces/cgbg
+      - cgbg-node-modules:/workspaces/cgbg/node_modules
+    depends_on:
+      - cgbg-mq
+      - cgbg-backend
+    command: >
+      sh -c "while [ ! -f /workspaces/cgbg/node_modules/.bin/nest ]; do sleep 5; done;
+             npm run start:dev"
+    networks:
+      - cgbg-network
+
+networks:
+  cgbg-network:
+    driver: bridge
+
+volumes:
+  cgbg-db-data:
+  cgbg-node-modules:

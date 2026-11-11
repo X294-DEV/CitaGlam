@@ -1,0 +1,149 @@
+<div class="saas-requests-container">
+  <header class="page-header">
+    <div class="header-main">
+      <h1>Solicitudes de Negocio</h1>
+      <p>Embudo de prospección, negociación y activación express</p>
+    </div>
+    
+    <button class="btn-refresh glass-panel" (click)="refresh()" [class.spinning]="isLoading()">
+      <i-lucide name="refresh-cw"></i-lucide>
+    </button>
+  </header>
+
+  <div class="filter-bar glass-panel">
+    <div class="search-box">
+      <i-lucide name="search"></i-lucide>
+      <input 
+        type="text" 
+        placeholder="Buscar por negocio o nombre..." 
+        [ngModel]="searchQuery()" 
+        (ngModelChange)="searchQuery.set($event)"
+      >
+    </div>
+    
+    <div class="status-filters">
+      <select [ngModel]="statusFilter()" (ngModelChange)="statusFilter.set($event)">
+        <option value="ALL">Todos los estados</option>
+        <option value="PENDING">Nuevos Leads</option>
+        <option value="PROPOSAL_SENT">Propuestas Enviadas</option>
+        <option value="WAITING_APPROVAL">Pagos por Validar</option>
+        <option value="APPROVED">Activados</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="requests-grid" *ngIf="filteredRequests().length > 0">
+    <div class="request-card glass-panel" *ngFor="let request of filteredRequests()">
+      <div class="card-status-bar" [attr.data-status]="request.status"></div>
+      
+      <div class="card-content">
+        <div class="business-info">
+          <div class="name-group">
+            <h3>{{ request.businessName }}</h3>
+            <span class="status-badge" [attr.data-status]="request.status">
+              {{ getStatusLabel(request.status) }}
+            </span>
+          </div>
+          <div class="contact-details">
+            <span class="detail">
+              <i-lucide name="users" class="icon-sm"></i-lucide>
+              {{ request.fullName }}
+            </span>
+            <span class="detail" *ngIf="request.email">
+              <i-lucide name="mail" class="icon-sm"></i-lucide>
+              {{ request.email }}
+            </span>
+            <span class="detail" *ngIf="request.phone">
+              <i-lucide name="phone" class="icon-sm"></i-lucide>
+              {{ request.phone }}
+            </span>
+            <span class="detail">
+              <i-lucide name="calendar" class="icon-sm"></i-lucide>
+              {{ request.createdAt | date:'mediumDate' }}
+            </span>
+          </div>
+
+          <div class="direct-contact-actions" *ngIf="request.phone">
+            <button class="btn-whatsapp" (click)="onContactWhatsApp(request)">
+              <i-lucide name="message-circle"></i-lucide>
+              Contactar por WhatsApp
+            </button>
+          </div>
+        </div>
+
+        <div class="proposition-details" *ngIf="request.status !== 'PENDING'">
+          <div class="negotiation-summary">
+            <div class="summary-item">
+              <span class="label">Propuesta</span>
+              <span class="value">{{ request.negotiatedPrice | currency:'MXN' }}</span>
+            </div>
+            <div class="summary-item">
+              <span class="label">Vigencia</span>
+              <span class="value">{{ request.monthsCount }} meses</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-footer">
+          <div class="lead-actions">
+            <!-- PENDING: Send initial proposal -->
+            <button 
+              *ngIf="request.status === 'PENDING'" 
+              class="btn-action btn-proposal"
+              (click)="onSendProposal(request)"
+            >
+              <i-lucide name="send" class="icon-sm"></i-lucide>
+              Enviar Propuesta
+            </button>
+
+            <!-- PROPOSAL_SENT: Can update or resend -->
+            <button 
+              *ngIf="request.status === 'PROPOSAL_SENT'" 
+              class="btn-action btn-outline"
+              (click)="onSendProposal(request)"
+            >
+              <i-lucide name="refresh-cw" class="icon-sm"></i-lucide>
+              Actualizar Oferta
+            </button>
+
+            <!-- WAITING_APPROVAL: Review payment and activate -->
+            <div class="approval-actions" *ngIf="request.status === 'WAITING_APPROVAL'">
+              <button 
+                class="btn-icon btn-evidence"
+                (click)="onViewHistory(request)"
+                title="Ver Historial de Comprobantes"
+              >
+                <i-lucide name="eye" class="icon-xs"></i-lucide>
+              </button>
+              <button 
+                class="btn-icon btn-reject" 
+                (click)="onRejectPayment(request)"
+                title="Rechazar Pago"
+              >
+                <i-lucide name="x-circle" class="icon-xs"></i-lucide>
+              </button>
+              <button class="btn-action btn-approve" (click)="onApprove(request)">
+                <i-lucide name="check-circle" class="icon-sm"></i-lucide>
+                Aprobar y Activar
+              </button>
+            </div>
+
+            <!-- APPROVED: Success state -->
+            <div class="success-indicator" *ngIf="request.status === 'APPROVED'">
+              <i-lucide name="check-circle" class="icon-md"></i-lucide>
+              <span>Negocio Activo</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="empty-state glass-panel" *ngIf="filteredRequests().length === 0">
+    <div class="empty-icon shadow-soft">
+      <i-lucide name="users" class="icon-lg"></i-lucide>
+    </div>
+    <h2>No hay solicitudes</h2>
+    <p>Cuando un negocio se registre desde el login, aparecerá aquí para su gestión comercial.</p>
+  </div>
+</div>

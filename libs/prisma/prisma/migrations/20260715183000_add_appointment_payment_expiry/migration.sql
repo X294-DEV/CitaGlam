@@ -1,0 +1,1 @@
+ALTER TABLE "Appointment" ADD COLUMN IF NOT EXISTS "paymentExpiry" TIMESTAMP(3);
