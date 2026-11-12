@@ -33,7 +33,7 @@ Orden de recorte si hay retraso: 1) productos, 2) WhatsApp (queda solo correo), 
 
 ## Flujo de trabajo
 
-1. Todo cambio entra por issue y pull request contra `main`, revisado por otra pareja.
+1. Todo cambio entra por issue y pull request contra `main` (no hay push directo). La revisión de otra pareja es recomendada, sobre todo si se tocan archivos de otra área, pero GitHub no la exige.
 2. Ramas: `pareja-N/S0-02-descripcion-corta`.
 3. Labels: `sprint-N`, `pareja-N`, `backend`, `frontend`, `database`, `docs`, `seguridad`, `bug`, `deuda`, `bloqueado`, `deseable`, `orquestador-review`.
 4. Cada sprint es un Milestone. Al cerrar: `docs/scrum/CIERRE_SPRINT_N.md` con completado, pendiente, decisiones y riesgos.
