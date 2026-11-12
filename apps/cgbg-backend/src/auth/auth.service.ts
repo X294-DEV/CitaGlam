@@ -45,6 +45,10 @@ export class AuthService {
         isActive: false,
         activationToken,
       },
+      select: {
+        id: true, email: true, firstName: true, lastName: true,
+        role: true, tenantId: true, isActive: true,
+      },
     });
 
     const activationUrl = `${
@@ -61,8 +65,7 @@ export class AuthService {
       },
     });
 
-    const { password, ...result } = user;
-    return result;
+    return user;
   }
 
   async activateAccount(token: string) {

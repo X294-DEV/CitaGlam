@@ -16,14 +16,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   async validate(payload: any) {
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
+      select: {
+        id: true, email: true, firstName: true, lastName: true,
+        role: true, tenantId: true, isActive: true,
+      },
     });
 
     if (!user || !user.isActive) {
       throw new UnauthorizedException('Usuario no válido o inactivo.');
     }
 
-    // Attach user but without password to request
-    const { password, ...result } = user;
-    return result;
+    return user;
   }
 }

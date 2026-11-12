@@ -15,6 +15,10 @@ import { UpdateAppointmentStatusDto } from './dto/update-appointment-status.dto'
 import { AvailabilityService } from './availability.service';
 import { MessagingService } from '../messaging/messaging.service';
 
+const publicClientSelect = { id: true, firstName: true, lastName: true } as const;
+const panelClientSelect = { ...publicClientSelect, email: true } as const;
+const tenantSelect = { id: true, name: true, slug: true, logoUrl: true } as const;
+
 @Injectable()
 export class AppointmentsService {
   constructor(
@@ -27,7 +31,6 @@ export class AppointmentsService {
   async create(dto: CreateAppointmentDto, authenticatedClientId?: string) {
     const service = await this.prisma.service.findUnique({
       where: { id: dto.serviceId },
-      include: { tenant: true },
     });
     if (!service) throw new NotFoundException('Servicio no encontrado.');
 
@@ -44,16 +47,8 @@ export class AppointmentsService {
 
       const user = await this.prisma.user.upsert({
         where: { email: dto.clientInfo.email },
-        update: {
-          firstName: dto.clientInfo.firstName,
-          lastName: dto.clientInfo.lastName,
-          profile: {
-            upsert: {
-              create: { phone: dto.clientInfo.phone },
-              update: { phone: dto.clientInfo.phone },
-            },
-          },
-        },
+        // Una reserva pública nunca modifica una cuenta existente.
+        update: {},
         create: {
           email: dto.clientInfo.email,
           firstName: dto.clientInfo.firstName,
@@ -64,7 +59,11 @@ export class AppointmentsService {
             create: { phone: dto.clientInfo.phone },
           },
         },
+        select: { id: true, role: true },
       });
+      if (user.role !== 'CLIENT') {
+        throw new ConflictException('No se pudo completar la reserva con los datos proporcionados.');
+      }
       finalClientId = user.id;
     }
 
@@ -101,8 +100,8 @@ export class AppointmentsService {
         },
       },
       include: {
-        tenant: true,
-        client: true,
+        tenant: { select: tenantSelect },
+        client: { select: publicClientSelect },
         service: true,
         branch: true,
         payment: true,
@@ -117,9 +116,14 @@ export class AppointmentsService {
       amount: appointment.payment?.amount?.toString() || service.price.toString(),
     });
 
+    const client = await this.prisma.user.findUniqueOrThrow({
+      where: { id: finalClientId },
+      select: { email: true },
+    });
+
     try {
       await this.emailProvider.sendEmail({
-        to: appointment.client.email,
+        to: client.email,
         subject: `Reserva recibida: ${service.name} - ${appointment.tenant.name}`,
         template: 'appointment-pending',
         context: {
@@ -140,7 +144,7 @@ export class AppointmentsService {
   async approve(id: string, tenantId: string) {
     const appointment = await this.prisma.appointment.findUnique({
       where: { id },
-      include: { client: true, tenant: true, service: true, payment: true },
+      include: { client: { select: panelClientSelect }, tenant: { select: tenantSelect }, service: true, payment: true },
     });
 
     if (!appointment || appointment.tenantId !== tenantId) {
@@ -148,7 +152,7 @@ export class AppointmentsService {
     }
 
     if (appointment.status !== 'WAITING_APPROVAL') {
-      throw new BadRequestException('Solo se pueden autorizar citas con comprobante pendiente de aprobaciÃ³n.');
+      throw new BadRequestException('Solo se pueden autorizar citas con comprobante pendiente de aprobación.');
     }
 
     const updated = await this.prisma.appointment.update({
@@ -189,7 +193,7 @@ export class AppointmentsService {
   async reject(id: string, tenantId: string, reason?: string) {
     const appointment = await this.prisma.appointment.findUnique({
       where: { id },
-      include: { client: true, tenant: true, service: true, payment: true },
+      include: { client: { select: panelClientSelect }, tenant: { select: tenantSelect }, service: true, payment: true },
     });
 
     if (!appointment || appointment.tenantId !== tenantId) {
@@ -197,7 +201,7 @@ export class AppointmentsService {
     }
 
     if (appointment.status !== 'WAITING_APPROVAL') {
-      throw new BadRequestException('Solo se pueden rechazar citas con comprobante pendiente de aprobaciÃ³n.');
+      throw new BadRequestException('Solo se pueden rechazar citas con comprobante pendiente de aprobación.');
     }
 
     const updated = await this.prisma.appointment.update({
@@ -234,7 +238,7 @@ export class AppointmentsService {
   async cancel(id: string, tenantId: string) {
     const appointment = await this.prisma.appointment.findUnique({
       where: { id },
-      include: { client: true, tenant: true, service: true },
+      include: { client: { select: panelClientSelect }, tenant: { select: tenantSelect }, service: true },
     });
 
     if (!appointment || appointment.tenantId !== tenantId) {
@@ -280,7 +284,7 @@ export class AppointmentsService {
   async updateStatus(id: string, dto: UpdateAppointmentStatusDto, tenantId: string) {
     const appointment = await this.prisma.appointment.findUnique({
       where: { id },
-      include: { client: true, tenant: true, service: true, payment: true },
+      include: { client: { select: panelClientSelect }, tenant: { select: tenantSelect }, service: true, payment: true },
     });
 
     if (!appointment || appointment.tenantId !== tenantId) {
@@ -296,7 +300,7 @@ export class AppointmentsService {
     }
 
     if (dto.status !== 'COMPLETED') {
-      throw new BadRequestException('Este cambio de estatus no estÃ¡ permitido desde el panel.');
+      throw new BadRequestException('Este cambio de estatus no está permitido desde el panel.');
     }
 
     if (appointment.status !== 'AUTHORIZED') {
@@ -312,7 +316,7 @@ export class AppointmentsService {
           .join('\n'),
       },
       include: {
-        client: { select: { firstName: true, lastName: true, email: true } },
+        client: { select: panelClientSelect },
         service: true,
         branch: true,
         payment: true,
@@ -324,7 +328,7 @@ export class AppointmentsService {
     return this.prisma.appointment.findMany({
       where: { tenantId, status: 'WAITING_APPROVAL' },
       include: {
-        client: { select: { firstName: true, lastName: true, email: true } },
+        client: { select: panelClientSelect },
         service: true,
         branch: true,
         payment: true,
@@ -336,7 +340,7 @@ export class AppointmentsService {
   async reschedule(id: string, dto: RescheduleAppointmentDto, tenantId: string) {
     const appointment = await this.prisma.appointment.findUnique({
       where: { id },
-      include: { client: true, tenant: true, service: true },
+      include: { client: { select: panelClientSelect }, tenant: { select: tenantSelect }, service: true },
     });
 
     if (!appointment || appointment.tenantId !== tenantId) {
@@ -392,7 +396,7 @@ export class AppointmentsService {
     return this.prisma.appointment.findMany({
       where: { tenantId },
       include: {
-        client: { select: { firstName: true, lastName: true, email: true } },
+        client: { select: panelClientSelect },
         service: true,
         branch: true,
         payment: true,
@@ -405,7 +409,7 @@ export class AppointmentsService {
     return this.prisma.appointment.findMany({
       where: { clientId },
       include: {
-        tenant: true,
+        tenant: { select: tenantSelect },
         service: true,
         branch: true,
         payment: true,

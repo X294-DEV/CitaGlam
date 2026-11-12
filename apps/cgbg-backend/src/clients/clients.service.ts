@@ -11,9 +11,11 @@ export class ClientsService {
         tenantId,
         role: 'CLIENT',
       },
-      include: {
-        profile: true,
+      select: {
+        id: true, firstName: true, lastName: true, email: true,
+        profile: { select: { phone: true } },
         appointments: {
+          where: { tenantId },
           select: {
             id: true,
             status: true,
@@ -47,7 +49,7 @@ export class ClientsService {
         firstName: client.firstName,
         lastName: client.lastName,
         email: client.email,
-        phone: client.profile?.phone || '', // Need to include profile if used, but User has phone in appointments service upsert
+        phone: client.profile?.phone || '',
         totalSpent,
         appointmentsCount: client.appointments.length,
         lastVisit,
@@ -58,9 +60,12 @@ export class ClientsService {
   async findOne(id: string, tenantId: string) {
     const client = await this.prisma.user.findFirst({
       where: { id, tenantId, role: 'CLIENT' },
-      include: {
-        profile: true,
+      select: {
+        id: true, firstName: true, lastName: true, email: true,
+        role: true, isActive: true, tenantId: true, createdAt: true, updatedAt: true,
+        profile: { select: { phone: true } },
         appointments: {
+          where: { tenantId },
           include: {
             service: true,
             branch: true,
@@ -98,6 +103,10 @@ export class ClientsService {
         role: 'CLIENT',
         isActive: true,
         // Profile or extra fields could go here
+      },
+      select: {
+        id: true, email: true, firstName: true, lastName: true,
+        role: true, tenantId: true, isActive: true,
       },
     });
   }
