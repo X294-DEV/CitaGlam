@@ -87,5 +87,5 @@ Confirma los scripts exactos en el `package.json` de cada app si un comando fall
 - El código compila (build del paquete afectado).
 - Se probó el comportamiento descrito en los criterios de aceptación.
 - La lista de seguridad de arriba está revisada.
-- El PR usa la plantilla, referencia el issue (`Closes #N`) y fue revisado por otra pareja.
+- El PR usa la plantilla y referencia el issue (`Closes #N`). La revisión de otra pareja es recomendada, no obligatoria: pídela sobre todo si el PR toca archivos de otra área.
 - Si cambió una decisión, quedó anotada en `docs/` o en este archivo.

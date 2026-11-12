@@ -25,7 +25,7 @@ Antes de crear o asignar tareas:
 4. Detecta dependencias entre tareas y entre parejas.
 
 Reglas:
-- main permanece estable. Todo cambio va en rama y entra por pull request revisado por otra pareja.
+- main permanece estable. Todo cambio va en rama y entra por pull request. La revisión de otra pareja es recomendada (sobre todo si se tocan archivos de otra área), pero no obligatoria.
 - Ramas: pareja-N/Sx-NN-descripcion-corta.
 - Solo la pareja 1 modifica schema.prisma y migraciones. Las demás piden cambios con un issue.
 - Cada issue tiene objetivo, alcance, criterios de aceptación, responsable y dependencias.

@@ -14,8 +14,8 @@ Soy la pareja N: <Nombre> / GitHub: <usuario>.
   Pareja 4 Adrián (X294-DEV): cliente público, calidad, despliegue y docs
 
 Repositorio: https://github.com/X294-DEV/CitaGlam (público). main está protegida:
-nadie puede hacer push directo, todo entra por pull request con 1 aprobación
-de otra pareja.
+nadie puede hacer push directo, todo entra por pull request. GitHub no exige
+aprobación, pero se recomienda que otra pareja revise, sobre todo si tocas su área.
 
 Antes de editar nada:
 1. Si no tengo el repo, clónalo. Si ya lo tengo, ponte en main y haz git pull.
@@ -39,7 +39,8 @@ Forma de trabajar:
 - Cambios pequeños. Antes del PR: build del paquete que tocaste y, si es API,
   una petición real. No digas que algo funciona sin haberlo ejecutado.
 - PR contra main con la plantilla de .github, "Closes #N" y la lista de
-  seguridad de AGENTS.md revisada. Pide revisión a otra pareja.
+  seguridad de AGENTS.md revisada. Si tocaste archivos de otra área, pide revisión
+  a esa pareja antes de fusionar.
 - Nunca: git reset --hard, git checkout -- <archivo>, git push --force,
   borrar volúmenes de Docker, ni subir .env, node_modules, logs, builds,
   uploads o datos reales. Archivos en UTF-8.
