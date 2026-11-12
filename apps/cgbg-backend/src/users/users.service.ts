@@ -33,6 +33,10 @@ export class UsersService {
         isActive: false,
         activationToken,
       },
+      select: {
+        id: true, email: true, firstName: true, lastName: true,
+        role: true, tenantId: true, isActive: true,
+      },
     });
 
     // Send Invitation Email
@@ -49,8 +53,7 @@ export class UsersService {
       },
     });
 
-    const { password: _, ...result } = user;
-    return result;
+    return user;
   }
 
   async findAll(tenantId: string) {
