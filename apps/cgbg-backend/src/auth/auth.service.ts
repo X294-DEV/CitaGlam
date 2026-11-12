@@ -1,3 +1,4 @@
+import { requireEnv } from '../config/required-env';
 import {
   Injectable,
   UnauthorizedException,
@@ -365,7 +366,7 @@ export class AuthService {
 
   private async getTokens(userId: string, email: string, role: string, tenantId: string | null) {
     const payload = { sub: userId, email, role, tenantId };
-    const secret = process.env.JWT_SECRET || 'CGBG_SECRET_KEY_DEV_2024';
+    const secret = requireEnv('JWT_SECRET');
     const accessExp = (process.env.JWT_ACCESS_EXPIRATION || '15m') as any;
     const refreshExp = (process.env.JWT_REFRESH_EXPIRATION || '7d') as any;
 
