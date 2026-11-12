@@ -30,10 +30,13 @@ RMQ_URL="amqp://guest:guest@localhost:5672"
 ```
 
 ### 3. Seguridad inicial
-Define una semilla de seguridad (puedes usar cualquier cadena al azar).
+Estas variables son obligatorias: si falta alguna, el backend o el seed no arrancan y te dicen cuál falta. Cada integrante usa sus propios valores; no se comparten ni se suben.
 ```bash
-JWT_SECRET="CAMBIAR_ESTE_VALOR"
+JWT_SECRET="CAMBIAR_ESTE_VALOR"          # genéralo con: openssl rand -base64 48
 JWT_EXPIRES_IN="1h"
+SEED_ADMIN_PASSWORD="CAMBIAR_ESTE_VALOR" # contraseña inicial de admin@cgbg.com
+FRONTEND_URL="http://localhost:4200"     # orígenes que acepta CORS
+WEB_URL="http://localhost:3000"
 ```
 
 ---

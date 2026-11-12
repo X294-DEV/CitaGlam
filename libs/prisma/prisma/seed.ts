@@ -68,7 +68,11 @@ async function main() {
 
   // 3. SuperAdmin User
   const superAdminEmail = 'admin@cgbg.com';
-  const hashedPassword = await argon2.hash('@Kodit2023');
+  const seedAdminPassword = process.env.SEED_ADMIN_PASSWORD;
+  if (!seedAdminPassword) {
+    throw new Error('Falta SEED_ADMIN_PASSWORD en el .env (contraseña inicial del superadmin).');
+  }
+  const hashedPassword = await argon2.hash(seedAdminPassword);
 
   const superAdmin = await prisma.user.upsert({
     where: { email: superAdminEmail },

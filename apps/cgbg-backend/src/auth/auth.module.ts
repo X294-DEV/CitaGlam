@@ -1,3 +1,4 @@
+import { requireEnv } from '../config/required-env';
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -15,7 +16,7 @@ import { AdminModule } from '../admin/admin.module';
     PassportModule,
     AdminModule,
     JwtModule.register({
-      secret: process.env.JWT_SECRET || 'CGBG_SECRET_KEY_DEV_2024',
+      secret: requireEnv('JWT_SECRET'),
       signOptions: { expiresIn: '1h' },
     }),
   ],
