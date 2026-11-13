@@ -41,7 +41,6 @@ export class AuthService {
         password: hashedPassword,
         firstName: dto.firstName,
         lastName: dto.lastName,
-        tenantId: dto.tenantId,
         role: 'CLIENT',
         isActive: false,
         activationToken,

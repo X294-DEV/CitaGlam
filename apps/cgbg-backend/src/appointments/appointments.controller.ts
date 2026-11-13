@@ -1,3 +1,6 @@
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { TenantGuard } from '../auth/guards/tenant.guard';
 import { Controller, Get, Post, Body, Patch, Delete, Param, UseGuards, Query, HttpStatus, HttpCode } from '@nestjs/common';
 import { AppointmentsService } from './appointments.service';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
@@ -47,26 +50,29 @@ export class AppointmentsController {
   }
 
   @Get('merchant')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, TenantGuard)
+  @Roles('ADMIN', 'STAFF')
   async findMerchantAppointments(@CurrentUser() user: any) {
-    // Only ADMIN or STAFF should access this normally, but multitenancy is checked in service
     return this.appointmentsService.findAllByTenant(user.tenantId);
   }
 
   @Get('pending-approval')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, TenantGuard)
+  @Roles('ADMIN', 'STAFF')
   async findPendingApproval(@CurrentUser() user: any) {
     return this.appointmentsService.findPendingApprovalByTenant(user.tenantId);
   }
 
   @Patch(':id/approve')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, TenantGuard)
+  @Roles('ADMIN', 'STAFF')
   async approve(@Param('id') id: string, @CurrentUser() user: any) {
     return this.appointmentsService.approve(id, user.tenantId);
   }
 
   @Patch(':id/reject')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, TenantGuard)
+  @Roles('ADMIN', 'STAFF')
   async reject(
     @Param('id') id: string,
     @Body() body: { reason?: string },
@@ -76,13 +82,15 @@ export class AppointmentsController {
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, TenantGuard)
+  @Roles('ADMIN', 'STAFF')
   async cancel(@Param('id') id: string, @CurrentUser() user: any) {
     return this.appointmentsService.cancel(id, user.tenantId);
   }
 
   @Patch(':id/status')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, TenantGuard)
+  @Roles('ADMIN', 'STAFF')
   async updateStatus(
     @Param('id') id: string,
     @Body() dto: UpdateAppointmentStatusDto,
@@ -92,7 +100,8 @@ export class AppointmentsController {
   }
 
   @Patch(':id/reschedule')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, TenantGuard)
+  @Roles('ADMIN', 'STAFF')
   async reschedule(
     @Param('id') id: string,
     @Body() dto: RescheduleAppointmentDto,
