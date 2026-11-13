@@ -6,9 +6,20 @@ import { startOfDay, endOfDay, addHours, format, parse, isValid } from 'date-fns
 export class AvailabilityService {
   constructor(private prisma: PrismaService) {}
 
-  async getAvailableSlots(branchId: string, serviceId: string, dateStr: string) {
+  async getAvailableSlots(branchId: string, serviceId: string, dateStr: string, excludeAppointmentId?: string) {
     const date = new Date(dateStr);
     if (!isValid(date)) throw new NotFoundException('Fecha inválida.');
+
+    const service = await this.prisma.service.findUnique({
+      where: { id: serviceId }, select: { tenantId: true },
+    });
+    if (!service) throw new NotFoundException('Servicio no encontrado.');
+    const branch = await this.prisma.branch.findUnique({
+      where: { id: branchId }, select: { tenantId: true },
+    });
+    if (!branch || branch.tenantId !== service.tenantId) {
+      throw new NotFoundException('Sucursal no encontrada.');
+    }
 
     const dayOfWeek = date.getUTCDay(); // 0-6
 
@@ -22,10 +33,6 @@ export class AvailabilityService {
     if (!schedule || !schedule.isOpen) {
       return []; // Closed
     }
-
-    // 2. Get Service Duration (though we assume hourly intervals HH:00 per user request)
-    const service = await this.prisma.service.findUnique({ where: { id: serviceId } });
-    if (!service) throw new NotFoundException('Servicio no encontrado.');
 
     // 3. Get Exceptions for the day
     const exceptions = await this.prisma.workException.findMany({
@@ -42,6 +49,8 @@ export class AvailabilityService {
     const appointments = await this.prisma.appointment.findMany({
       where: {
         branchId,
+        tenantId: service.tenantId,
+        id: excludeAppointmentId ? { not: excludeAppointmentId } : undefined,
         startTime: {
           gte: startOfDay(date),
           lte: endOfDay(date),

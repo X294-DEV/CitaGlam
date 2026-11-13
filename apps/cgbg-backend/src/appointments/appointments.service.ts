@@ -34,6 +34,14 @@ export class AppointmentsService {
     });
     if (!service) throw new NotFoundException('Servicio no encontrado.');
 
+    const branch = await this.prisma.branch.findUnique({
+      where: { id: dto.branchId },
+      select: { tenantId: true },
+    });
+    if (!branch || branch.tenantId !== service.tenantId) {
+      throw new NotFoundException('Sucursal no encontrada.');
+    }
+
     let finalClientId = authenticatedClientId;
 
     if (!finalClientId) {
@@ -338,13 +346,17 @@ export class AppointmentsService {
   }
 
   async reschedule(id: string, dto: RescheduleAppointmentDto, tenantId: string) {
-    const appointment = await this.prisma.appointment.findUnique({
-      where: { id },
+    const appointment = await this.prisma.appointment.findFirst({
+      where: { id, tenantId },
       include: { client: { select: panelClientSelect }, tenant: { select: tenantSelect }, service: true },
     });
 
     if (!appointment || appointment.tenantId !== tenantId) {
       throw new NotFoundException('Cita no encontrada.');
+    }
+
+    if (!['PENDING_PAYMENT', 'WAITING_APPROVAL', 'AUTHORIZED'].includes(appointment.status)) {
+      throw new BadRequestException('Solo se pueden reprogramar citas pendientes o autorizadas.');
     }
 
     const newDate = new Date(dto.newStartTime);
@@ -354,6 +366,7 @@ export class AppointmentsService {
       appointment.branchId,
       appointment.serviceId,
       newDate.toISOString(),
+      appointment.id,
     );
     const requestHour = format(newDate, 'HH:00');
 
@@ -362,7 +375,7 @@ export class AppointmentsService {
     }
 
     const updated = await this.prisma.appointment.update({
-      where: { id },
+      where: { id, tenantId },
       data: {
         startTime: newDate,
         endTime: addHours(newDate, 1),
