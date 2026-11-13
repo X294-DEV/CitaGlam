@@ -118,11 +118,20 @@ test('S0-02: reserva pública y respuestas de usuarios sin secretos', async (t) 
       assert.deepEqual(await prisma.user.findUnique({ where: { id: clientId }, include: { profile: true } }), before);
     });
 
+    await t.test('registro público rechaza tenantId ajeno sin crear una cuenta', async () => {
+      const result = await api('/auth/register', 'POST', {
+        email: email('register'), password, firstName: 'Registro', lastName: 'Ficticio', tenantId,
+      });
+      assert.equal(result.status, 400);
+      assert.equal(await prisma.user.count({ where: { email: email('register') } }), 0);
+    });
+
     await t.test('registro, personal, clientes y citas del panel no exponen secretos', async () => {
       const registration = await api('/auth/register', 'POST', {
         email: email('register'), password, firstName: 'Registro', lastName: 'Ficticio',
       });
       assert.equal(registration.status, 201);
+      assert.equal(registration.body.tenantId, null);
       assertNoSecrets(registration.body);
       const login = await api('/auth/login', 'POST', { email: admin.email, password });
       assert.equal(login.status, 200);
@@ -147,6 +156,71 @@ test('S0-02: reserva pública y respuestas de usuarios sin secretos', async (t) 
         assertNoSecrets(result.body);
       }
     });
+
+    await t.test('CLIENT, SUPERADMIN y usuarios sin tenant no pueden operar el panel', async () => {
+      const login = await api('/auth/login', 'POST', { email: admin.email, password });
+      assert.equal(login.status, 200);
+      const token = login.body.access_token;
+      const id = randomUUID();
+      const endpoints = [
+        ['/appointments/merchant', 'GET'], ['/appointments/pending-approval', 'GET'],
+        [`/appointments/${id}/approve`, 'PATCH'], [`/appointments/${id}/reject`, 'PATCH'],
+        [`/appointments/${id}`, 'DELETE'], [`/appointments/${id}/status`, 'PATCH'],
+        [`/appointments/${id}/reschedule`, 'PATCH'],
+        ['/clients', 'GET'], [`/clients/${id}`, 'GET'], ['/clients', 'POST'],
+        ['/dashboard/metrics', 'GET'], ['/dashboard/revenue-chart', 'GET'], ['/dashboard/service-stats', 'GET'],
+        ['/notifications', 'GET'], [`/notifications/${id}/read`, 'PATCH'],
+        ['/notifications/read-all', 'PATCH'], ['/notifications/clear-range/1', 'DELETE'],
+        ['/notifications/all', 'DELETE'], [`/notifications/${id}`, 'DELETE'],
+      ];
+      try {
+        for (const role of ['CLIENT', 'SUPERADMIN', 'ADMIN', 'STAFF']) {
+          await prisma.user.update({ where: { id: admin.id }, data: {
+            role, tenantId: ['ADMIN', 'STAFF'].includes(role) ? null : tenantId,
+          } });
+          for (const [path, method] of endpoints) {
+            const result = await api(path, method, undefined, token);
+            assert.equal(result.status, 403, `${role}: ${method} ${path}`);
+          }
+        }
+        for (const role of ['ADMIN', 'STAFF']) {
+          await prisma.user.update({ where: { id: admin.id }, data: { role, tenantId } });
+          for (const path of ['/appointments/merchant', '/appointments/pending-approval', '/clients',
+            '/dashboard/metrics', '/dashboard/revenue-chart', '/dashboard/service-stats', '/notifications']) {
+            assert.equal((await api(path, 'GET', undefined, token)).status, 200, `${role}: ${path}`);
+          }
+        }
+        assert.equal((await api('/appointments/mine', 'GET', undefined, token)).status, 200);
+        assert.equal((await api('/appointments/merchant')).status, 401);
+      } finally {
+        await prisma.user.update({ where: { id: admin.id }, data: { role: 'ADMIN', tenantId } });
+      }
+    });
+
+    await t.test('notificaciones se limitan al usuario y tenant del JWT', async () => {
+      const login = await api('/auth/login', 'POST', { email: admin.email, password });
+      const token = login.body.access_token;
+      const own = await prisma.notification.create({ data: {
+        userId: admin.id, tenantId, title: 'Propia', message: 'Ficticia',
+      } });
+      const peer = await prisma.notification.create({ data: {
+        userId: clientId, tenantId, title: 'Ajena', message: 'Ficticia',
+      } });
+      const foreign = await prisma.notification.create({ data: {
+        userId: admin.id, tenantId: randomUUID(), title: 'Otro negocio', message: 'Ficticia',
+      } });
+      const list = await api('/notifications', 'GET', undefined, token);
+      assert.deepEqual(list.body.map((n) => n.id), [own.id]);
+      for (const id of [peer.id, foreign.id]) {
+        assert.equal((await api(`/notifications/${id}/read`, 'PATCH', undefined, token)).status, 404);
+        assert.equal((await api(`/notifications/${id}`, 'DELETE', undefined, token)).status, 404);
+      }
+      assert.equal((await api(`/notifications/${own.id}/read`, 'PATCH', undefined, token)).status, 200);
+      assert.equal((await api('/notifications/read-all', 'PATCH', undefined, token)).status, 200);
+      assert.equal((await api('/notifications/clear-range/0', 'DELETE', undefined, token)).status, 200);
+      assert.equal((await api('/notifications/all', 'DELETE', undefined, token)).status, 200);
+      assert.equal(await prisma.notification.count({ where: { id: { in: [peer.id, foreign.id] }, isRead: false } }), 2);
+    });
   } finally {
     // Solo elimina las filas ficticias de esta ejecución; conserva los volúmenes.
     if (tenantId) {
@@ -156,6 +230,8 @@ test('S0-02: reserva pública y respuestas de usuarios sin secretos', async (t) 
       await prisma.service.deleteMany({ where: { tenantId } });
       await prisma.branch.deleteMany({ where: { tenantId } });
     }
+    const users = await prisma.user.findMany({ where: { email: { in: createdEmails } }, select: { id: true } });
+    await prisma.notification.deleteMany({ where: { userId: { in: users.map((u) => u.id) } } });
     await prisma.refreshToken.deleteMany({ where: { user: { email: { in: createdEmails } } } });
     await prisma.profile.deleteMany({ where: { user: { email: { in: createdEmails } } } });
     await prisma.user.deleteMany({ where: { email: { in: createdEmails } } });

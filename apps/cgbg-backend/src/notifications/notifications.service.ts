@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@cgbg/prisma';
 import { NotificationsGateway } from './notifications.gateway';
 import { NotificationType, NotificationActionType } from '@prisma/client';
@@ -42,41 +42,52 @@ export class NotificationsService {
     }
   }
 
-  async findAllByUser(userId: string) {
+  async findAllByUser(userId: string, tenantId: string) {
     return this.prisma.notification.findMany({
-      where: { userId },
+      where: { userId, tenantId },
       orderBy: { createdAt: 'desc' },
       take: 50,
     });
   }
 
-  async markAsRead(id: string) {
+  private async requireOwnedNotification(id: string, userId: string, tenantId: string) {
+    const notification = await this.prisma.notification.findFirst({
+      where: { id, userId, tenantId },
+      select: { id: true },
+    });
+    if (!notification) throw new NotFoundException('Notificación no encontrada.');
+  }
+
+  async markAsRead(id: string, userId: string, tenantId: string) {
+    await this.requireOwnedNotification(id, userId, tenantId);
     return this.prisma.notification.update({
-      where: { id },
+      where: { id, userId, tenantId },
       data: { isRead: true },
     });
   }
 
-  async markAllAsRead(userId: string) {
+  async markAllAsRead(userId: string, tenantId: string) {
     return this.prisma.notification.updateMany({
-      where: { userId, isRead: false },
+      where: { userId, tenantId, isRead: false },
       data: { isRead: true },
     });
   }
 
-  async delete(id: string) {
+  async delete(id: string, userId: string, tenantId: string) {
+    await this.requireOwnedNotification(id, userId, tenantId);
     return this.prisma.notification.delete({
-      where: { id },
+      where: { id, userId, tenantId },
     });
   }
 
-  async deleteByRange(userId: string, days: number) {
+  async deleteByRange(userId: string, tenantId: string, days: number) {
     const cutOffDate = new Date();
     cutOffDate.setDate(cutOffDate.getDate() - days);
 
     return this.prisma.notification.deleteMany({
       where: {
         userId,
+        tenantId,
         createdAt: {
           lt: cutOffDate,
         },
@@ -84,9 +95,9 @@ export class NotificationsService {
     });
   }
 
-  async deleteAll(userId: string) {
+  async deleteAll(userId: string, tenantId: string) {
     return this.prisma.notification.deleteMany({
-      where: { userId },
+      where: { userId, tenantId },
     });
   }
 }
