@@ -5,9 +5,8 @@ import {
   ConflictException,
   BadRequestException,
 } from '@nestjs/common';
-import { writeFileSync, existsSync, mkdirSync } from 'fs';
-import { join, extname } from 'path';
 import { PrismaService } from '@cgbg/prisma';
+import { resolveStoredFile, saveUploadedFile, streamStoredFile } from '../receipts/stored-files';
 import { EmailProvider } from '@cgbg/email';
 import { Role } from '@prisma/client';
 import { addDays, addMonths } from 'date-fns';
@@ -905,32 +904,10 @@ export class AdminService {
       throw new BadRequestException('Esta solicitud ya tiene un comprobante en revisión o ya ha sido activada.');
     }
 
-    // Validate MIME types
-    const allowedMimeTypes = [
-      'image/jpeg', 'image/png', 'image/webp', 
-      'image/gif', 'image/bmp', 'image/heic', 
-      'image/heif', 'image/tiff', 'application/pdf'
-    ];
-    
-    if (!file || !allowedMimeTypes.includes(file.mimetype)) {
-      throw new BadRequestException('Formato de archivo no permitido. Use JPG, PNG, WEBP o PDF.');
-    }
-
-    // Ensure uploads directory exists
-    const uploadDir = join(process.cwd(), 'apps', 'cgbg-backend', 'uploads', 'proofs');
-    if (!existsSync(uploadDir)) {
-      mkdirSync(uploadDir, { recursive: true });
-    }
-
-    // Generate unique filename
-    const fileName = `proof-${id}-${Date.now()}${extname(file.originalname)}`;
-    const filePath = join(uploadDir, fileName);
-
-    // Save file
-    writeFileSync(filePath, file.buffer);
-
-    // Store the public URL
-    const evidenceUrl = `/uploads/proofs/${fileName}`;
+    // Valida el contenido real (JPG, PNG o PDF, máx. 5MB) y genera el nombre en el
+    // servidor. Se guarda la ruta interna (`proofs/<archivo>`), no una URL pública:
+    // el archivo solo se entrega por endpoints autenticados.
+    const evidenceUrl = saveUploadedFile('proofs', `proof-${request.id}`, file);
 
     const updatedRequest = await this.prisma.businessRequest.update({
       where: { id },
@@ -1143,5 +1120,14 @@ export class AdminService {
       where: { businessRequestId: id },
       orderBy: { createdAt: 'desc' }
     });
+  }
+
+  /**
+   * Comprobante de suscripción (carpeta `proofs`) para el SuperAdministrador.
+   * `fileName` es el nombre del archivo que aparece al final de `evidenceUrl`.
+   */
+  getProofFile(fileName: string) {
+    const filePath = resolveStoredFile('proofs', `proofs/${fileName}`);
+    return streamStoredFile(filePath, 'comprobante-suscripcion');
   }
 }

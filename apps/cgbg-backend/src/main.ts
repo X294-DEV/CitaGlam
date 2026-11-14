@@ -2,34 +2,23 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { join } from 'path';
-import { existsSync, mkdirSync } from 'fs';
 import helmet from 'helmet';
 import { requireEnv } from './config/required-env';
+import { folderPath } from './receipts/stored-files';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // Cabeceras de seguridad (antes de los archivos estáticos para que también
-  // apliquen a /uploads). Se permite que el panel y el sitio público, que
-  // están en otros orígenes, carguen archivos de /uploads como el logo.
+  // Cabeceras de seguridad. Se permite que el panel y el sitio público, que
+  // están en otros orígenes, carguen respuestas de la API.
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-  
-  // Ensure uploads directory exists
-  const uploadDir = join(process.cwd(), 'apps', 'cgbg-backend', 'uploads', 'proofs');
-  const receiptDir = join(process.cwd(), 'apps', 'cgbg-backend', 'uploads', 'receipts');
-  if (!existsSync(uploadDir)) {
-    mkdirSync(uploadDir, { recursive: true });
-  }
-  if (!existsSync(receiptDir)) {
-    mkdirSync(receiptDir, { recursive: true });
-  }
 
-  // Static Assets (Proofs, etc)
-  app.useStaticAssets(join(process.cwd(), 'apps', 'cgbg-backend', 'uploads'), {
-    prefix: '/uploads',
-  });
-  
+  // Carpetas de comprobantes. Ya NO se sirven como estáticos (S0-05): solo se
+  // entregan por endpoints autenticados (GET /receipts/:appointmentId/file,
+  // GET /admin/global/proof-files/:fileName, GET /subscriptions/my-history/:paymentId/evidence).
+  folderPath('receipts');
+  folderPath('proofs');
+
   // Enable Global Validation
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,

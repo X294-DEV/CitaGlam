@@ -13,6 +13,7 @@ import {
   PaymentStatus,
 } from './dto/subscription-payment.dto';
 import { CreatePackageDto, UpdatePackageDto } from './dto/package.dto';
+import { isStoredFileReference } from '../receipts/stored-files';
 import { CreatePromotionDto, UpdatePromotionDto } from './dto/promotion.dto';
 import {
   addMonths,
@@ -136,6 +137,12 @@ export class SubscriptionsService {
     });
     if (!pkg) {
       throw new NotFoundException('Paquete no encontrado.');
+    }
+
+    // Una ruta de archivo interno solo la puede generar el servidor; si el cliente
+    // la enviara, podría apuntar al comprobante de otro negocio y descargarlo.
+    if (isStoredFileReference(dto.evidenceUrl)) {
+      throw new BadRequestException('evidenceUrl no puede apuntar a un archivo interno.');
     }
 
     // Calculate amount based on pricesByTerm if available

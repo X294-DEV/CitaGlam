@@ -1,8 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@cgbg/prisma';
 import Redis from 'ioredis';
-import { existsSync, mkdirSync, writeFileSync } from 'fs';
-import { extname, join } from 'path';
+import { resolveStoredFile, saveUploadedFile, streamStoredFile } from './stored-files';
 
 @Injectable()
 export class ReceiptsService {
@@ -42,17 +41,6 @@ export class ReceiptsService {
   }
 
   async upload(token: string, file: Express.Multer.File) {
-    if (!file) throw new BadRequestException('El archivo es obligatorio.');
-
-    const allowed = ['image/jpeg', 'image/png', 'application/pdf'];
-    if (!allowed.includes(file.mimetype)) {
-      throw new BadRequestException('Solo se permiten archivos JPG, PNG o PDF.');
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      throw new BadRequestException('El archivo no debe superar 5MB.');
-    }
-
     const appointmentId = await this.redis.get(this.key(token));
     if (!appointmentId) {
       throw new NotFoundException('El enlace de comprobante no existe o expiró.');
@@ -67,15 +55,9 @@ export class ReceiptsService {
       throw new BadRequestException('Esta cita ya no está esperando comprobante.');
     }
 
-    const uploadDir = join(process.cwd(), 'apps', 'cgbg-backend', 'uploads', 'receipts');
-    if (!existsSync(uploadDir)) mkdirSync(uploadDir, { recursive: true });
-
-    const extension = extname(file.originalname) || this.extensionFromMime(file.mimetype);
-    const fileName = `${appointment.id}-${Date.now()}${extension}`;
-    const filePath = join(uploadDir, fileName);
-    writeFileSync(filePath, file.buffer);
-
-    const receiptUrl = `/uploads/receipts/${fileName}`;
+    // Valida el contenido real (JPG, PNG o PDF) y genera el nombre en el servidor.
+    // Se guarda la ruta interna; el archivo solo se entrega por GET /receipts/:appointmentId/file.
+    const receiptUrl = saveUploadedFile('receipts', appointment.id, file);
 
     await this.prisma.appointment.update({
       where: { id: appointment.id },
@@ -98,17 +80,25 @@ export class ReceiptsService {
     return {
       message: 'Comprobante recibido. Tu cita queda pendiente de aprobación.',
       appointmentId: appointment.id,
-      receiptUrl,
     };
+  }
+
+  /**
+   * Comprobante de una cita para el panel. El tenant sale del JWT: si la cita es
+   * de otro negocio responde 404, igual que si no existiera.
+   */
+  async getReceiptFile(appointmentId: string, tenantId: string) {
+    const appointment = await this.prisma.appointment.findFirst({
+      where: { id: appointmentId, tenantId },
+      select: { id: true, payment: { select: { receiptUrl: true } } },
+    });
+    if (!appointment) throw new NotFoundException('Comprobante no encontrado.');
+
+    const filePath = resolveStoredFile('receipts', appointment.payment?.receiptUrl);
+    return streamStoredFile(filePath, `comprobante-${appointment.id}`);
   }
 
   private key(token: string) {
     return `cgbg:payment:link:${token}`;
-  }
-
-  private extensionFromMime(mimetype: string) {
-    if (mimetype === 'image/jpeg') return '.jpg';
-    if (mimetype === 'image/png') return '.png';
-    return '.pdf';
   }
 }
