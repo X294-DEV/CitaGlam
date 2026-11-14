@@ -1,3 +1,6 @@
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { GLOBAL_RATE_LIMIT } from './config/rate-limits';
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -17,6 +20,10 @@ import { ReceiptsModule } from './receipts/receipts.module';
 
 @Module({
   imports: [
+    ThrottlerModule.forRoot({
+      throttlers: [GLOBAL_RATE_LIMIT],
+      errorMessage: 'Demasiadas peticiones. Espera un minuto e inténtalo de nuevo.',
+    }),
     PrismaModule,
     AuthModule,
     TenantsModule,
@@ -32,6 +39,6 @@ import { ReceiptsModule } from './receipts/receipts.module';
     ReceiptsModule
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}
