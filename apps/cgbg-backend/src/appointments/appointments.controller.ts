@@ -1,3 +1,5 @@
+import { Throttle } from '@nestjs/throttler';
+import { RATE_LIMITS } from '../config/rate-limits';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { TenantGuard } from '../auth/guards/tenant.guard';
@@ -37,6 +39,10 @@ export class AppointmentsController {
     return this.appointmentsService.create(dto, authenticatedClientId);
   }
 
+  // Límite por IP (ver config/rate-limits.ts). Sprint 1: aquí se integra el
+  // captcha (Cloudflare Turnstile): validar el token del DTO antes de llamar
+  // a appointmentsService.create y rechazar con 400 si es inválido.
+  @Throttle(RATE_LIMITS.publicBooking)
   @Post('public')
   @HttpCode(HttpStatus.CREATED)
   async createPublic(@Body() dto: CreateAppointmentDto) {

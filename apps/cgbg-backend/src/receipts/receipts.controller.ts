@@ -1,3 +1,5 @@
+import { Throttle } from '@nestjs/throttler';
+import { RATE_LIMITS } from '../config/rate-limits';
 import {
   Controller,
   Get,
@@ -13,11 +15,13 @@ import { ReceiptsService } from './receipts.service';
 export class ReceiptsController {
   constructor(private receiptsService: ReceiptsService) {}
 
+  @Throttle(RATE_LIMITS.enumeration)
   @Get('validate/:token')
   validate(@Param('token') token: string) {
     return this.receiptsService.validateToken(token);
   }
 
+  @Throttle(RATE_LIMITS.publicUpload)
   @Post('upload/:token')
   @UseInterceptors(FileInterceptor('file'))
   upload(
