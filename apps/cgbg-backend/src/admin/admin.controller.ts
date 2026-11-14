@@ -11,6 +11,9 @@ import {
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { PrivateFileHeaders } from '../receipts/stored-files';
 import { Role } from '@prisma/client';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { CreateExpressTenantDto } from './dto/create-express-tenant.dto';
@@ -242,5 +245,14 @@ export class AdminController {
       throw new UnauthorizedException('Solo el SuperAdministrador puede ver el historial de pagos.');
     }
     return this.adminService.getBusinessRequestProofs(id);
+  }
+
+  /** Archivo de un comprobante de suscripción (nombre final de `evidenceUrl`). Solo SuperAdministrador. */
+  @Get('proof-files/:fileName')
+  @UseGuards(RolesGuard)
+  @Roles(Role.SUPERADMIN)
+  @PrivateFileHeaders()
+  getProofFile(@Param('fileName') fileName: string) {
+    return this.adminService.getProofFile(fileName);
   }
 }
