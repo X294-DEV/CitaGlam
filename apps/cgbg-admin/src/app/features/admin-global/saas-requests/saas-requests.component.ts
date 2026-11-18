@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { SuperAdminService, Package } from '../../../core/services/super-admin.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { EnvironmentService } from '../../../core/services/environment.service';
+import { ProtectedFileService } from '../../../core/services/protected-file.service';
 import { 
   LucideAngularModule, 
   Users, 
@@ -40,6 +41,7 @@ export class SaasRequestsComponent implements OnInit {
   private superAdminService = inject(SuperAdminService);
   private notificationService = inject(NotificationService);
   public env = inject(EnvironmentService);
+  private protectedFiles = inject(ProtectedFileService);
 
   requests = signal<any[]>([]);
   packages = signal<Package[]>([]);
@@ -309,7 +311,7 @@ export class SaasRequestsComponent implements OnInit {
                       ${p.adminNotes ? `<p style="margin: 4px 0 0; font-size: 0.7rem; color: #E53E3E; font-style: italic;">Motivo: ${p.adminNotes}</p>` : ''}
                     </td>
                     <td style="padding: 12px 5px; text-align: center;">
-                      <a href="${this.env.formatUrl(p.evidenceUrl)}" target="_blank" style="color: #4CAF50; text-decoration: none;">
+                      <a href="#" aria-label="Ver comprobante" title="Ver comprobante" data-evidence="${encodeURIComponent(p.evidenceUrl ?? '')}" style="color: #4CAF50; text-decoration: none; cursor: pointer;">
                         <span style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: #E8F5E9;">
                           👁️
                         </span>
@@ -328,6 +330,15 @@ export class SaasRequestsComponent implements OnInit {
           width: '600px',
           confirmButtonText: 'Cerrar',
           confirmButtonColor: '#2D4A47',
+          // El archivo ya no es público: se pide con sesión al hacer clic en el ojo.
+          didOpen: (popup) => {
+            popup.addEventListener('click', (event) => {
+              const link = (event.target as HTMLElement).closest('[data-evidence]');
+              if (!link) return;
+              event.preventDefault();
+              this.protectedFiles.openProofFile(decodeURIComponent(link.getAttribute('data-evidence') ?? ''));
+            });
+          },
         });
       },
       error: () => {

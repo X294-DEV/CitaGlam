@@ -53,11 +53,11 @@
         </dl>
 
         <div class="approval-actions">
-          <a *ngIf="receiptUrl(appointment); else noReceipt"
+          <a *ngIf="hasReceipt(appointment); else noReceipt"
              class="receipt-link"
-             [href]="receiptUrl(appointment)!"
-             target="_blank"
-             rel="noopener">
+             href="#"
+            
+             (click)="openReceipt($event, appointment)">
             Ver comprobante
           </a>
 
@@ -73,7 +73,7 @@
           </button>
           <button class="btn-approve"
                   type="button"
-                  [disabled]="actionLoadingId() === appointment.id || !receiptUrl(appointment)"
+                  [disabled]="actionLoadingId() === appointment.id || !hasReceipt(appointment)"
                   (click)="approvePayment(appointment)">
             {{ actionLoadingId() === appointment.id ? 'Procesando...' : 'Confirmar pago' }}
           </button>
@@ -122,11 +122,11 @@
       <div class="detail-item">
         <span>Comprobante</span>
         <strong>
-          <a *ngIf="receiptUrl(selected); else noDetailReceipt"
+          <a *ngIf="hasReceipt(selected); else noDetailReceipt"
              class="table-link"
-             [href]="receiptUrl(selected)!"
-             target="_blank"
-             rel="noopener">
+             href="#"
+            
+             (click)="openReceipt($event, selected)">
             Abrir comprobante
           </a>
           <ng-template #noDetailReceipt>-</ng-template>
@@ -143,7 +143,7 @@
       <button *ngIf="selected.status === 'WAITING_APPROVAL'"
               class="btn-approve"
               type="button"
-              [disabled]="actionLoadingId() === selected.id || !receiptUrl(selected)"
+              [disabled]="actionLoadingId() === selected.id || !hasReceipt(selected)"
               (click)="approvePayment(selected)">
         Confirmar pago
       </button>
@@ -208,14 +208,14 @@
           </td>
           <td>{{ paymentAmount(appointment) | currency:'MXN':'symbol':'1.2-2' }}</td>
           <td>
-            <a *ngIf="receiptUrl(appointment)"
+            <a *ngIf="hasReceipt(appointment)"
                class="table-link"
-               [href]="receiptUrl(appointment)!"
-               target="_blank"
-               rel="noopener">
+               href="#"
+              
+               (click)="openReceipt($event, appointment)">
               Abrir
             </a>
-            <span *ngIf="!receiptUrl(appointment)">-</span>
+            <span *ngIf="!hasReceipt(appointment)">-</span>
           </td>
           <td>
             <div class="actions-menu" (click)="$event.stopPropagation()">
@@ -239,7 +239,7 @@
                 </button>
                 <button *ngIf="canConfirmPayment(appointment)"
                         type="button"
-                        [disabled]="!receiptUrl(appointment)"
+                        [disabled]="!hasReceipt(appointment)"
                         (click)="approvePayment(appointment)">
                   Confirmar pago
                 </button>

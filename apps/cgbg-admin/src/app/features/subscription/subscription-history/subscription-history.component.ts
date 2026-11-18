@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { MySubscriptionService, MySubscriptionPayment } from '../../../core/services/my-subscription.service';
 import { LucideAngularModule, CreditCard, ChevronRight, CheckCircle, Clock, XCircle, FileText } from 'lucide-angular';
 import { AuthService } from '../../../core/services/auth.service';
+import { ProtectedFileService } from '../../../core/services/protected-file.service';
 
 @Component({
   selector: 'app-subscription-history',
@@ -57,7 +58,7 @@ import { AuthService } from '../../../core/services/auth.service';
                   </td>
                   <td>{{ (p.approvedAt | date:'dd/MM/yyyy') || '-' }}</td>
                   <td>
-                    <a *ngIf="p.evidenceUrl" [href]="p.evidenceUrl" target="_blank" class="link-btn">
+                    <a *ngIf="p.evidenceUrl" href="#" (click)="openEvidence($event, p)" class="link-btn">
                       <i-lucide name="file-text"></i-lucide> Ver
                     </a>
                   </td>
@@ -111,6 +112,13 @@ import { AuthService } from '../../../core/services/auth.service';
 })
 export class SubscriptionHistoryComponent implements OnInit {
   private subService = inject(MySubscriptionService);
+  private protectedFiles = inject(ProtectedFileService);
+
+  /** El archivo se pide con sesión al endpoint del propio negocio; no se enlaza directo. */
+  openEvidence(event: Event, payment: MySubscriptionPayment): void {
+    event.preventDefault();
+    this.protectedFiles.openMySubscriptionEvidence(payment.id);
+  }
   authService = inject(AuthService);
 
   history = signal<MySubscriptionPayment[]>([]);

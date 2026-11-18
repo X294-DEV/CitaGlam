@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Appointment, AppointmentService, AppointmentStatus } from '../../../core/services/appointment.service';
-import { EnvironmentService } from '../../../core/services/environment.service';
+import { ProtectedFileService } from '../../../core/services/protected-file.service';
 
 @Component({
   selector: 'app-appointments-list',
@@ -12,7 +12,7 @@ import { EnvironmentService } from '../../../core/services/environment.service';
 })
 export class AppointmentsListComponent implements OnInit {
   private appointmentService = inject(AppointmentService);
-  private env = inject(EnvironmentService);
+  private protectedFiles = inject(ProtectedFileService);
 
   appointments = signal<Appointment[]>([]);
   pendingApproval = signal<Appointment[]>([]);
@@ -190,9 +190,14 @@ export class AppointmentsListComponent implements OnInit {
     });
   }
 
-  receiptUrl(appointment: Appointment): string | null {
-    const receiptUrl = appointment.payment?.receiptUrl;
-    return receiptUrl ? this.env.formatUrl(receiptUrl) : null;
+  /** La cita tiene un comprobante cargado (el archivo se pide con sesión, no se enlaza directo). */
+  hasReceipt(appointment: Appointment): boolean {
+    return !!appointment.payment?.receiptUrl;
+  }
+
+  openReceipt(event: Event, appointment: Appointment): void {
+    event.preventDefault();
+    this.protectedFiles.openAppointmentReceipt(appointment.id);
   }
 
   paymentAmount(appointment: Appointment): number {

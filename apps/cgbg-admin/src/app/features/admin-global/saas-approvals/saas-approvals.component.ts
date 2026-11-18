@@ -24,12 +24,14 @@ import {
   Package,
 } from 'lucide-angular';
 import { NotificationService } from '../../../core/services/notification.service';
+import { ProtectedFileService } from '../../../core/services/protected-file.service';
+import { ProtectedImageComponent } from '../../../shared/protected-image/protected-image.component';
 import { FormsModule } from '@angular/forms';
 
 @Component({
   selector: 'app-saas-approvals',
   standalone: true,
-  imports: [CommonModule, LucideAngularModule, FormsModule],
+  imports: [CommonModule, LucideAngularModule, FormsModule, ProtectedImageComponent],
   template: `
     <div class="saas-approvals">
       <header class="page-header">
@@ -108,11 +110,12 @@ import { FormsModule } from '@angular/forms';
                     <p>Sin comprobante adjunto</p>
                   </div>
                   <div *ngIf="p.evidenceUrl" class="image-container">
-                    <img [src]="p.evidenceUrl" alt="Comprobante" />
+                    <app-protected-image [path]="proofPath(p.evidenceUrl)" />
                     <div class="image-actions">
                       <a
-                        [href]="p.evidenceUrl"
-                        target="_blank"
+                        href="#"
+                       
+                        (click)="openProof($event, p.evidenceUrl)"
                         class="btn-view"
                       >
                         <i-lucide name="external-link"></i-lucide>
@@ -273,8 +276,8 @@ import { FormsModule } from '@angular/forms';
           <div class="evidence-section" *ngIf="h.evidenceUrl">
             <span class="section-label">Evidencia de Pago</span>
             <div class="evidence-full">
-               <img [src]="h.evidenceUrl" alt="Comprobante">
-               <a [href]="h.evidenceUrl" target="_blank" class="btn-expand">
+               <app-protected-image [path]="proofPath(h.evidenceUrl)" fit="natural" />
+               <a href="#" (click)="openProof($event, h.evidenceUrl)" class="btn-expand">
                  <i-lucide name="external-link"></i-lucide>
                  Ver en tamaño completo
                </a>
@@ -420,6 +423,17 @@ import { FormsModule } from '@angular/forms';
 export class SaasApprovalsComponent implements OnInit {
   private saasService = inject(SuperAdminService);
   private notificationService = inject(NotificationService);
+  private protectedFiles = inject(ProtectedFileService);
+
+  /** Ruta protegida del comprobante (el archivo ya no es público). */
+  proofPath(evidenceUrl: string | null | undefined): string | null {
+    return this.protectedFiles.proofFilePath(evidenceUrl);
+  }
+
+  openProof(event: Event, evidenceUrl: string): void {
+    event.preventDefault();
+    this.protectedFiles.openProofFile(evidenceUrl);
+  }
 
   activeTab = signal<'pending' | 'history'>('pending');
   pending = signal<PendingSubscription[]>([]);
