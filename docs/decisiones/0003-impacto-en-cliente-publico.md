@@ -120,13 +120,13 @@ El backend no debe devolver datos de otras personas en `POST /appointments/publi
 8. Quitar `PwaSafetyHandler` si no hay PWA.
 
 ## Respuestas de la pareja 1 (PR #23, 19-nov-2026)
-Definiciones del contrato futuro; no significan que  ya las implemente.
+Definiciones del contrato futuro; no significan que `main` ya las implemente.
 
-1.  y  de  son obligatorios.
-2. La reserva pública () manda los datos del cliente; el backend resuelve o crea el  del negocio.  es solo del panel.
-3. Horas como ISO 8601 con zona ();  es un identificador IANA. Hasta publicar el contrato se mantiene la convención UTC actual.
-4.  devuelve opciones con  y .
-5.  queda fuera del Sprint 1.
+1. `email` y `lastName` de `Customer` son obligatorios.
+2. La reserva pública (`POST /appointments/public`) manda los datos del cliente; el backend resuelve o crea el `Customer` del negocio. `customerId` es solo del panel.
+3. Horas como ISO 8601 con zona (`Timestamptz`); `Branch.timezone` es un identificador IANA. Hasta publicar el contrato se mantiene la convención UTC actual.
+4. `available` devuelve opciones con `startTime` y `endTime`.
+5. `birthday` queda fuera del Sprint 1.
 6. Contrato escrito comprometido para el 19-nov-2026.
 7. La aceptación de términos es de la reserva/cita; el backend la valida y registra la fecha con su reloj.
 
