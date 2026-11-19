@@ -1,0 +1,11 @@
+{
+  "name": "@cgbg/shared-types",
+  "version": "0.1.0",
+  "private": true,
+  "types": "./src/index.ts",
+  "exports": { ".": { "types": "./src/index.ts" } },
+  "scripts": {
+    "build": "tsc --project tsconfig.json --noEmit",
+    "check:consumers": "node scripts/check-consumers.cjs"
+  }
+}
