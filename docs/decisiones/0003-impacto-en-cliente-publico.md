@@ -1,6 +1,6 @@
 # 0003 — Impacto del Sprint 1 y 2 en el cliente público (`apps/cgbg-client`)
 
-- **Estado:** propuesta, pendiente de revisión de la pareja 1 (contrato) y la pareja 2 (comprobantes)
+- **Estado:** actualizado el 19-nov-2026 con las respuestas de la pareja 1 (PR #23). Pendiente: contrato escrito (S1-05) y respuestas de la pareja 2 sobre comprobantes
 - **Autor:** pareja 4 (Adrián)
 - **Fecha:** 18 de noviembre de 2026
 
@@ -56,7 +56,7 @@ Hoy el cliente fuerza UTC de extremo a extremo para que la hora local "sobreviva
 | `BookingForm.tsx:73` | Arma `startTime` como `${date}T${slot}:00.000Z` | Con `Timestamptz`, el servidor debería devolver los horarios como instantes ISO y el cliente reenviar el elegido tal cual |
 | `ReceiptUploadForm.tsx:6-13` | Misma función duplicada, con `timeZone: "UTC"` | Extraer a un solo helper compartido |
 
-Dependencias: la API debe incluir la zona de la sucursal en `/tenants/public/:slug/branches` y devolver `startTime` con zona. Pregunta para la pareja 1: ¿`available` devolverá cadenas `HH:mm` locales o instantes ISO?
+Dependencias: la API debe incluir la zona de la sucursal en `/tenants/public/:slug/branches` y devolver `startTime` con zona. Respuesta de la pareja 1: `available` devuelve opciones con `startTime` y `endTime` en ISO con zona, y `Branch` expone `timezone` (IANA). El cliente deja de armar `startTime` con `Z`.
 
 ## 2. Duración real de citas
 
@@ -73,7 +73,7 @@ El cliente no calcula huecos: solo pinta lo que devuelve `/available`. El cambio
 
 | Archivo:línea | Qué hace | Cambio esperado |
 | --- | --- | --- |
-| `BookingForm.tsx:77-79` | Parte `fullName` por el primer espacio; `lastName` por defecto es `"Cliente"` | Decidir si `Customer` guarda un solo `name`. Hoy un nombre inventado ("Cliente") se guarda como apellido |
+| `BookingForm.tsx:77-79` | Parte `fullName` por el primer espacio; `lastName` por defecto es `"Cliente"` | Confirmado: `lastName` y `email` son obligatorios. Pedir nombre y apellido por separado; dejar de usar `"Cliente"` como apellido |
 | `BookingForm.tsx:84-90` | `clientInfo` con `firstName`, `lastName`, `email`, `phone`, `termsAccepted` | Contrato nuevo de la pareja 1; `phone` pasa a ser la llave por tenant |
 | `BookingForm.tsx:189-191` | `email` y `phone` obligatorios, sin formato | Normalizar teléfono (con lada) antes de enviar; decidir si `email` sigue obligatorio |
 | `BookingForm.tsx:192-195` | `termsAccepted` sin enlace a los términos | Enlazar texto de términos/aviso de privacidad (también aplica a WhatsApp) |
@@ -119,9 +119,20 @@ El backend no debe devolver datos de otras personas en `POST /appointments/publi
 7. Página de "negocio no encontrado" para slug inválido.
 8. Quitar `PwaSafetyHandler` si no hay PWA.
 
+## Respuestas de la pareja 1 (PR #23, 19-nov-2026)
+Definiciones del contrato futuro; no significan que `main` ya las implemente.
+
+1. `email` y `lastName` de `Customer` son obligatorios.
+2. La reserva pública (`POST /appointments/public`) manda los datos del cliente; el backend resuelve o crea el `Customer` del negocio. `customerId` es solo del panel.
+3. Horas como ISO 8601 con zona (`Timestamptz`); `Branch.timezone` es un identificador IANA. Hasta publicar el contrato se mantiene la convención UTC actual.
+4. `available` devuelve opciones con `startTime` y `endTime`.
+5. `birthday` queda fuera del Sprint 1.
+6. Contrato escrito comprometido para el 19-nov-2026.
+7. La aceptación de términos es de la reserva/cita; el backend la valida y registra la fecha con su reloj.
+
+Las tareas del cliente están en el issue S1-07 (#36); el captcha, en S1-08 (#37).
+
 ## Preguntas abiertas
 
-1. **Pareja 1:** ¿`/appointments/available` devolverá `HH:mm` locales o instantes ISO? ¿La sucursal expondrá `timezone` en el endpoint público?
-2. **Pareja 1:** ¿`Customer` guarda un solo `name` o `firstName`/`lastName`? ¿`email` seguirá obligatorio?
-3. **Pareja 2:** ¿Habrá reenvío de enlace de pago vencido? ¿Por qué canal llega el primero (WhatsApp, correo o ambos)?
-4. **Equipo:** ¿Se agrega CAPTCHA al formulario público o basta el límite de peticiones?
+1. **Pareja 2:** ¿Habrá reenvío de enlace de pago vencido? ¿Por qué canal llega el primero (WhatsApp, correo o ambos)?
+2. **Equipo:** ¿Se agrega CAPTCHA al formulario público o basta el límite de peticiones? (S1-08)
