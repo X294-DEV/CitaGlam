@@ -43,7 +43,7 @@ CREATE TABLE "Customer" (
 CREATE UNIQUE INDEX "Customer_tenantId_phone_key" ON "Customer"("tenantId", "phone");
 CREATE UNIQUE INDEX "Customer_tenantId_userId_key" ON "Customer"("tenantId", "userId");
 INSERT INTO "Customer" ("id", "tenantId", "userId", "firstName", "lastName", "email", "phone", "createdAt", "updatedAt")
-SELECT md5(c."tenantId" || ':' || u.id)::uuid::text, c."tenantId", u.id,
+SELECT gen_random_uuid()::text, c."tenantId", u.id,
   trim(u."firstName"), trim(u."lastName"), trim(u.email),
   regexp_replace(p.phone, '[[:space:]().-]', '', 'g'), u."createdAt", u."updatedAt"
 FROM customer_candidates c JOIN "User" u ON u.id = c."userId" JOIN "Profile" p ON p."userId" = u.id;

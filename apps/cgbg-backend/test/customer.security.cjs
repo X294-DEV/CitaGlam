@@ -59,6 +59,7 @@ test('S1-01: migración poblada, rollback y clientes aislados por tenant', async
     assert.equal(await db.customer.count({ where: { userId: orphan } }), 0);
     assert.equal(await db.user.count({ where: { id: { in: [u, orphan] } } }), 2);
     const preserved = await db.appointment.findUnique({ where: { id: a }, include: { customer: true } });
+    assert.ok(require('class-validator').isUUID(preserved.customer.id), 'Los IDs migrados deben pasar la validación UUID del panel.');
     assert.equal(preserved.customer.tenantId, t);
     assert.equal(preserved.customer.userId, u);
     assert.equal(preserved.customer.phone, '+525500000001');
