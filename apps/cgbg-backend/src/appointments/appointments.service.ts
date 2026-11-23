@@ -413,9 +413,9 @@ export class AppointmentsService {
     });
   }
 
-  async findAllByClient(clientId: string) {
+  async findAllByClient(clientId: string, tenantId: string) {
     return this.prisma.appointment.findMany({
-      where: { customer: { userId: clientId } },
+      where: { tenantId, customer: { userId: clientId, tenantId } },
       include: {
         tenant: { select: tenantSelect },
         service: true,

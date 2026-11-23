@@ -105,7 +105,11 @@ test('S1-01: migración poblada, rollback y clientes aislados por tenant', async
     const clientToken = (await api('/auth/login','POST',{ email:'cliente@example.test',password })).body.access_token;
     const mine = await api('/appointments/mine','GET',undefined,clientToken);
     assert.equal(mine.status,200);
-    assert.deepEqual(mine.body.map(x=>x.id),[a]);
+    assert.deepEqual(mine.body.map(x=>x.id),[], 'El tenant del JWT limita también la vista personal.');
+    await db.user.update({ where: { id: u }, data: { tenantId: t } });
+    const scopedMine = await api('/appointments/mine','GET',undefined,clientToken);
+    assert.equal(scopedMine.status,200);
+    assert.deepEqual(scopedMine.body.map(x=>x.id),[a]);
     console.log('Migración poblada conserva citas/cuentas; rollback por teléfono ausente/duplicado. HTTP 201/409/404/400 y mine por vínculo autenticado verificados.');
   } finally {
     if (apiProcess) {
