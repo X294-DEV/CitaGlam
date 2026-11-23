@@ -1,5 +1,6 @@
-import { IsNotEmpty, IsUUID, IsString, IsOptional, IsDateString, ValidateNested, IsEmail, IsBoolean } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsNotEmpty, IsUUID, IsString, IsOptional, IsDateString, ValidateNested, IsEmail, IsBoolean, Matches } from 'class-validator';
+import { normalizePhone } from '../../clients/dto/create-customer.dto';
+import { Transform, Type } from 'class-transformer';
 
 class ClientInfo {
   @IsEmail()
@@ -14,9 +15,10 @@ class ClientInfo {
   @IsNotEmpty()
   lastName: string;
 
+  @Transform(({ value }) => normalizePhone(value))
   @IsString()
-  @IsOptional()
-  phone?: string;
+  @Matches(/^\+[1-9]\d{1,14}$/)
+  phone: string;
 
   @IsBoolean()
   @IsOptional()

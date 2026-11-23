@@ -1,3 +1,4 @@
+import { CreateCustomerDto } from './dto/create-customer.dto';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { TenantGuard } from '../auth/guards/tenant.guard';
@@ -24,7 +25,7 @@ export class ClientsController {
   }
 
   @Post()
-  async create(@Body() body: any, @Request() req: any) {
+  async create(@Body() body: CreateCustomerDto, @Request() req: any) {
     const tenantId = req.user.tenantId;
     return this.clientsService.createManual(tenantId, body);
   }

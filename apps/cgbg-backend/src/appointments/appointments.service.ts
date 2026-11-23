@@ -7,6 +7,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { normalizePhone } from '../clients/dto/create-customer.dto';
 import { PrismaService } from '@cgbg/prisma';
 import { EmailProvider } from '@cgbg/email';
 import { addHours } from 'date-fns';
@@ -44,7 +45,11 @@ export class AppointmentsService {
       throw new NotFoundException('Sucursal no encontrada.');
     }
 
-    let finalClientId = authenticatedClientId;
+    const linkedCustomer = authenticatedClientId ? await this.prisma.customer.findFirst({
+      where: { userId: authenticatedClientId, tenantId: service.tenantId }, select: { id: true },
+    }) : null;
+    if (authenticatedClientId && !linkedCustomer) throw new NotFoundException('Cliente no encontrado en este negocio.');
+    let finalClientId = linkedCustomer?.id;
 
     if (!finalClientId) {
       if (!dto.clientInfo) {
@@ -55,26 +60,14 @@ export class AppointmentsService {
         throw new ForbiddenException('Debe aceptar los términos y condiciones para continuar.');
       }
 
-      const user = await this.prisma.user.upsert({
-        where: { email: dto.clientInfo.email },
-        // Una reserva pública nunca modifica una cuenta existente.
-        update: {},
-        create: {
-          email: dto.clientInfo.email,
-          firstName: dto.clientInfo.firstName,
-          lastName: dto.clientInfo.lastName,
-          role: 'CLIENT',
-          isActive: true,
-          profile: {
-            create: { phone: dto.clientInfo.phone },
-          },
-        },
-        select: { id: true, role: true },
+      const phone = normalizePhone(dto.clientInfo.phone) as string;
+      const customer = await this.prisma.customer.upsert({
+        where: { tenantId_phone: { tenantId: service.tenantId, phone } }, update: {},
+        create: { tenantId: service.tenantId, phone, email: dto.clientInfo.email,
+          firstName: dto.clientInfo.firstName, lastName: dto.clientInfo.lastName },
+        select: { id: true },
       });
-      if (user.role !== 'CLIENT') {
-        throw new ConflictException('No se pudo completar la reserva con los datos proporcionados.');
-      }
-      finalClientId = user.id;
+      finalClientId = customer.id;
     }
 
     const startTime = parseInstant(dto.startTime);
@@ -96,7 +89,7 @@ export class AppointmentsService {
         tenantId: service.tenantId,
         branchId: dto.branchId,
         serviceId: dto.serviceId,
-        clientId: finalClientId,
+        customerId: finalClientId,
         startTime,
         endTime: new Date(selectedSlot.endTime),
         paymentExpiry: addHours(new Date(), 24),
@@ -111,7 +104,7 @@ export class AppointmentsService {
       },
       include: {
         tenant: { select: tenantSelect },
-        client: { select: publicClientSelect },
+        customer: { select: publicClientSelect },
         service: true,
         branch: true,
         payment: true,
@@ -121,12 +114,12 @@ export class AppointmentsService {
     await this.messaging.emitAppointmentCreated({
       appointmentId: appointment.id,
       tenantId: appointment.tenantId,
-      customerId: appointment.clientId,
+      customerId: appointment.customerId,
       dateTime: appointment.startTime.toISOString(),
       amount: appointment.payment?.amount?.toString() || service.price.toString(),
     });
 
-    const client = await this.prisma.user.findUniqueOrThrow({
+    const client = await this.prisma.customer.findUniqueOrThrow({
       where: { id: finalClientId },
       select: { email: true },
     });
@@ -137,7 +130,7 @@ export class AppointmentsService {
         subject: `Reserva recibida: ${service.name} - ${appointment.tenant.name}`,
         template: 'appointment-pending',
         context: {
-          user_name: appointment.client.firstName,
+          user_name: appointment.customer.firstName,
           business_name: appointment.tenant.name,
           service_name: service.name,
           appointment_date: displayDate(startTime, appointment.branch.timezone),
@@ -154,7 +147,7 @@ export class AppointmentsService {
   async approve(id: string, tenantId: string) {
     const appointment = await this.prisma.appointment.findUnique({
       where: { id },
-      include: { client: { select: panelClientSelect }, tenant: { select: tenantSelect }, branch: true, service: true, payment: true },
+      include: { customer: { select: panelClientSelect }, tenant: { select: tenantSelect }, branch: true, service: true, payment: true },
     });
 
     if (!appointment || appointment.tenantId !== tenantId) {
@@ -182,11 +175,11 @@ export class AppointmentsService {
 
     try {
       await this.emailProvider.sendEmail({
-        to: appointment.client.email,
+        to: appointment.customer.email,
         subject: `¡Cita Confirmada! - ${appointment.tenant.name}`,
         template: 'appointment-confirmation',
         context: {
-          user_name: appointment.client.firstName,
+          user_name: appointment.customer.firstName,
           business_name: appointment.tenant.name,
           service_name: appointment.service.name,
           appointment_date: displayDate(appointment.startTime, appointment.branch.timezone),
@@ -203,7 +196,7 @@ export class AppointmentsService {
   async reject(id: string, tenantId: string, reason?: string) {
     const appointment = await this.prisma.appointment.findUnique({
       where: { id },
-      include: { client: { select: panelClientSelect }, tenant: { select: tenantSelect }, branch: true, service: true, payment: true },
+      include: { customer: { select: panelClientSelect }, tenant: { select: tenantSelect }, branch: true, service: true, payment: true },
     });
 
     if (!appointment || appointment.tenantId !== tenantId) {
@@ -226,11 +219,11 @@ export class AppointmentsService {
 
     try {
       await this.emailProvider.sendEmail({
-        to: appointment.client.email,
+        to: appointment.customer.email,
         subject: `Comprobante rechazado - ${appointment.tenant.name}`,
         template: 'appointment-rejected',
         context: {
-          user_name: appointment.client.firstName,
+          user_name: appointment.customer.firstName,
           business_name: appointment.tenant.name,
           service_name: appointment.service.name,
           appointment_date: displayDate(appointment.startTime, appointment.branch.timezone),
@@ -248,7 +241,7 @@ export class AppointmentsService {
   async cancel(id: string, tenantId: string) {
     const appointment = await this.prisma.appointment.findUnique({
       where: { id },
-      include: { client: { select: panelClientSelect }, tenant: { select: tenantSelect }, branch: true, service: true },
+      include: { customer: { select: panelClientSelect }, tenant: { select: tenantSelect }, branch: true, service: true },
     });
 
     if (!appointment || appointment.tenantId !== tenantId) {
@@ -273,11 +266,11 @@ export class AppointmentsService {
 
     try {
       await this.emailProvider.sendEmail({
-        to: appointment.client.email,
+        to: appointment.customer.email,
         subject: `Cita cancelada - ${appointment.tenant.name}`,
         template: 'appointment-cancelled',
         context: {
-          user_name: appointment.client.firstName,
+          user_name: appointment.customer.firstName,
           business_name: appointment.tenant.name,
           service_name: appointment.service.name,
           appointment_date: displayDate(appointment.startTime, appointment.branch.timezone),
@@ -294,7 +287,7 @@ export class AppointmentsService {
   async updateStatus(id: string, dto: UpdateAppointmentStatusDto, tenantId: string) {
     const appointment = await this.prisma.appointment.findUnique({
       where: { id },
-      include: { client: { select: panelClientSelect }, tenant: { select: tenantSelect }, branch: true, service: true, payment: true },
+      include: { customer: { select: panelClientSelect }, tenant: { select: tenantSelect }, branch: true, service: true, payment: true },
     });
 
     if (!appointment || appointment.tenantId !== tenantId) {
@@ -326,7 +319,7 @@ export class AppointmentsService {
           .join('\n'),
       },
       include: {
-        client: { select: panelClientSelect },
+        customer: { select: panelClientSelect },
         service: true,
         branch: true,
         payment: true,
@@ -338,7 +331,7 @@ export class AppointmentsService {
     return this.prisma.appointment.findMany({
       where: { tenantId, status: 'WAITING_APPROVAL' },
       include: {
-        client: { select: panelClientSelect },
+        customer: { select: panelClientSelect },
         service: true,
         branch: true,
         payment: true,
@@ -350,7 +343,7 @@ export class AppointmentsService {
   async reschedule(id: string, dto: RescheduleAppointmentDto, tenantId: string) {
     const appointment = await this.prisma.appointment.findFirst({
       where: { id, tenantId },
-      include: { client: { select: panelClientSelect }, tenant: { select: tenantSelect }, branch: true, service: true },
+      include: { customer: { select: panelClientSelect }, tenant: { select: tenantSelect }, branch: true, service: true },
     });
 
     if (!appointment || appointment.tenantId !== tenantId) {
@@ -387,11 +380,11 @@ export class AppointmentsService {
 
     try {
       await this.emailProvider.sendEmail({
-        to: appointment.client.email,
+        to: appointment.customer.email,
         subject: `Cambio de horario: ${appointment.tenant.name}`,
         template: 'appointment-rescheduled',
         context: {
-          user_name: appointment.client.firstName,
+          user_name: appointment.customer.firstName,
           service_name: appointment.service.name,
           business_name: appointment.tenant.name,
           appointment_date: displayDate(newDate, appointment.branch.timezone),
@@ -411,7 +404,7 @@ export class AppointmentsService {
     return this.prisma.appointment.findMany({
       where: { tenantId },
       include: {
-        client: { select: panelClientSelect },
+        customer: { select: panelClientSelect },
         service: true,
         branch: true,
         payment: true,
@@ -422,7 +415,7 @@ export class AppointmentsService {
 
   async findAllByClient(clientId: string) {
     return this.prisma.appointment.findMany({
-      where: { clientId },
+      where: { customer: { userId: clientId } },
       include: {
         tenant: { select: tenantSelect },
         service: true,
