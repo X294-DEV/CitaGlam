@@ -32,8 +32,8 @@ export class BranchesService {
   }
 
   async findOne(id: string, tenantId: string) {
-    const branch = await this.prisma.branch.findUnique({
-      where: { id },
+    const branch = await this.prisma.branch.findFirst({
+      where: { id, tenantId },
     });
 
     if (!branch || branch.tenantId !== tenantId) {
@@ -48,7 +48,7 @@ export class BranchesService {
     await this.findOne(id, tenantId);
 
     return this.prisma.branch.update({
-      where: { id },
+      where: { id, tenantId },
       data: dto,
     });
   }
@@ -59,7 +59,7 @@ export class BranchesService {
     await this.findOne(branchId, tenantId);
 
     return this.prisma.businessSchedule.findMany({
-      where: { branchId },
+      where: { branchId, branch: { tenantId } },
       orderBy: { dayOfWeek: 'asc' },
     });
   }
@@ -127,8 +127,8 @@ export class BranchesService {
   }
 
   async removeException(id: string, tenantId: string) {
-    const exception = await this.prisma.workException.findUnique({
-      where: { id },
+    const exception = await this.prisma.workException.findFirst({
+      where: { id, tenantId },
     });
 
     if (!exception || exception.tenantId !== tenantId) {
@@ -136,7 +136,7 @@ export class BranchesService {
     }
 
     return this.prisma.workException.delete({
-      where: { id },
+      where: { id, tenantId },
     });
   }
 }
