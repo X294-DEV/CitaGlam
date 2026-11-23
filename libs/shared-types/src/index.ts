@@ -1,4 +1,7 @@
 /** Contrato objetivo del Sprint 1; estos tipos NO activan endpoints ni migraciones. */
+export type {
+  PublicTenantConfigDto, PublicTenantDto, PublicServiceCategoryDto, PublicServiceDto,
+} from './public-catalog';
 export type UUID = string;
 /** Instante ISO con Z u offset explícito. Respuestas normalizadas a UTC/Z. */
 export type ISODateTime = string;

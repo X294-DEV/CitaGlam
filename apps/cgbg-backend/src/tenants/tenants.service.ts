@@ -4,6 +4,7 @@ import { RegisterBusinessDto } from './dto/register-business.dto';
 import { EmailProvider } from '@cgbg/email';
 import * as argon2 from 'argon2';
 import * as crypto from 'crypto';
+import type { PublicTenantDto, PublicServiceDto } from '@cgbg/shared-types';
 
 @Injectable()
 export class TenantsService {
@@ -109,10 +110,15 @@ export class TenantsService {
     });
   }
 
-  async getPublicConfig(slug: string) {
+  async getPublicConfig(slug: string): Promise<PublicTenantDto> {
     const tenant = await this.prisma.tenant.findUnique({
       where: { slug: slug.toLowerCase() },
-      include: { config: true },
+      select: {
+        id: true, name: true, slug: true, logoUrl: true, isActive: true,
+        config: { select: {
+          primaryColor: true, secondaryColor: true, welcomeMessage: true, businessCategory: true,
+        } },
+      },
     });
 
     if (!tenant || !tenant.isActive) {
@@ -136,13 +142,18 @@ export class TenantsService {
     });
   }
 
-  async getPublicServices(slug: string) {
+  async getPublicServices(slug: string): Promise<PublicServiceDto[]> {
     const tenant = await this.findActiveTenantBySlug(slug);
-    return this.prisma.service.findMany({
+    const services = await this.prisma.service.findMany({
       where: { tenantId: tenant.id, isActive: true },
-      include: { category: true },
+      select: {
+        id: true, name: true, description: true, durationMin: true, price: true,
+        imageUrl: true, color: true,
+        category: { select: { id: true, name: true, order: true } },
+      },
       orderBy: { name: 'asc' },
     });
+    return services.map((service) => ({ ...service, price: service.price.toString() }));
   }
 
   private async findActiveTenantBySlug(slug: string) {

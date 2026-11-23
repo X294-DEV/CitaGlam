@@ -39,6 +39,15 @@ Se mantienen las rutas `/clients`; no se agregan endpoints nuevos de Customer. U
 
 ## Rutas objetivo
 
+### Catálogo público implementado en #40
+
+Estas dos respuestas ya se seleccionan explícitamente en el backend de este cambio, independientemente de las migraciones de #30–#33:
+
+- `GET /tenants/config/:slug` devuelve `PublicTenantDto`: id, name, slug, logoUrl nullable y config nullable. Config solo incluye primaryColor, secondaryColor nullable, welcomeMessage nullable y businessCategory nullable. No devuelve customSettings, IDs de configuración, suscripción, usuarios ni datos internos.
+- `GET /tenants/public/:slug/services` devuelve `PublicServiceDto[]`, solo servicios activos del negocio activo. Incluye id, name, description nullable, durationMin, price como cadena decimal, imageUrl nullable, color nullable y category nullable. Categoría solo contiene id, name y order; sin tenantId, isActive ni timestamps internos. Una lista vacía es `[]`.
+- Slug inexistente o negocio inactivo: 404. El slug se normaliza a minúsculas como antes. Los ejemplos tipados publicTenant/publicServices están en examples/contract.examples.ts.
+- Pareja 4 adopta ambos tipos en #36, incluido `ThemeInjector` y los props de `BookingForm`; no debe copiar interfaces. El paquete permite importar `PublicTenantDto` y `PublicServiceDto` desde `@cgbg/shared-types`.
+
 | Método y ruta existente | Entrada | Respuesta/acceso |
 | --- | --- | --- |
 | GET /clients | Sin tenant enviado | CustomerListItem[], 200; JWT + ADMIN/STAFF + tenant. |
