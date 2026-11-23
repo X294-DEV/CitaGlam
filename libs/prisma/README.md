@@ -8,6 +8,6 @@ La migración `20261123093000_customer_per_tenant` es transaccional. Valida nomb
 
 Con aplicaciones detenidas y DATABASE_URL del entorno correcto: `npx prisma migrate deploy --schema=libs/prisma/prisma/schema.prisma`, después generar Prisma, compilar y arrancar el backend nuevo. Si Prisma registró una migración fallida cuya transacción se revirtió, revisar error/datos antes de `prisma migrate resolve --rolled-back 20261123093000_customer_per_tenant` y reintentar. Nunca borrar volúmenes.
 
-Las citas pasan de clientId/User a customerId/Customer. /clients filtra por tenant del JWT y select explícito. /appointments/mine busca Customer vinculados al User autenticado; no acepta customerId como identidad. La reserva pública deja de crear/modificar User, resuelve por teléfono del tenant sin sobrescribir Customer existente. Los cuerpos definitivos panel/público y términos son #33; horas y duración son #31/#32.
+Las citas pasan de clientId/User a customerId/Customer. /clients filtra por tenant del JWT y select explícito. /appointments/mine exige tenant y busca Customer del tenant del JWT vinculados al User autenticado; no acepta customerId como identidad. La reserva pública deja de crear/modificar User, resuelve por teléfono del tenant sin sobrescribir Customer existente. Los cuerpos definitivos panel/público y términos son #33; horas y duración son #31/#32.
 
 Prueba con datos anteriores y API real: `node --env-file=.env --test apps/cgbg-backend/test/customer.security.cjs`. Crea y elimina únicamente su base temporal ficticia; nunca la base configurada ni volúmenes.
