@@ -237,6 +237,7 @@ model Appointment {
   paymentExpiry DateTime?
   status    AppointmentStatus @default(PENDING_PAYMENT)
   notes     String?
+  termsAcceptedAt DateTime?   @db.Timestamptz(3)
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
   branch    Branch            @relation(fields: [branchId], references: [id])

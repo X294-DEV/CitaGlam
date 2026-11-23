@@ -40,7 +40,7 @@ exports.withLocalApiDatabase = async function (port, run) {
         await new Promise(r=>setTimeout(r,250));
       }
       assert.ok(ready,logs);
-      return {db,async api(route,method='GET',body,token){
+      return {db,base,async api(route,method='GET',body,token){
         const r=await fetch(base+route,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},...(body?{body:JSON.stringify(body)}:{})});
         return {status:r.status,body:await r.json()};
       }};

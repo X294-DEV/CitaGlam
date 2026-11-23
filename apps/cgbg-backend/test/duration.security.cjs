@@ -34,7 +34,7 @@ test('S1-03: duración, concurrencia, cancelación y traslapes en PostgreSQL',as
     assert.equal(a90.body[0].endTime,'2026-12-01T16:30:00.000Z');
     assert.equal(a90.body[1].startTime,'2026-12-01T16:30:00.000Z');
     const request=(i)=>{
-      const clientInfo={firstName:'Cliente',lastName:'Ficticio',email:`race${i}@example.test`,phone:`+52550000001${i}`};
+      const clientInfo={firstName:'Cliente',lastName:'Ficticio',email:`race${i}@example.test`,phone:modern?'+525500000011':`+52550000001${i}`};
       return {branchId:b,serviceId:long,startTime:a90.body[0].startTime,
         ...(modern?{slug,termsAccepted:true,clientInfo}:{clientInfo:{...clientInfo,termsAccepted:true}})};
     };
@@ -43,6 +43,7 @@ test('S1-03: duración, concurrencia, cancelación y traslapes en PostgreSQL',as
     const winner=race.find(x=>x.status===201).body;
     assert.equal(winner.endTime,'2026-12-01T16:30:00.000Z');
     assert.equal(await db.appointment.count({where:{tenantId:t}}),1);
+    if(db.customer)assert.equal(await db.customer.count({where:{tenantId:t}}),2, 'El cliente de la reserva perdedora debe revertirse con la cita.');
     const identity=db.customer?{customerId:(await db.customer.findFirst({where:{tenantId:t,userId:u}})).id}:{clientId:u};
     const row={tenantId:t,branchId:b,serviceId:short,...identity,status:'AUTHORIZED'};
     await assert.rejects(db.appointment.create({data:{...row,startTime:new Date('2026-12-01T15:30Z'),endTime:new Date('2026-12-01T16:00Z')}}),/23P01|appointment_no_overlap/);

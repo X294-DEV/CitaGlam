@@ -1,49 +1,51 @@
-import { IsNotEmpty, IsUUID, IsString, IsOptional, IsDateString, ValidateNested, IsEmail, IsBoolean, Matches } from 'class-validator';
-import { normalizePhone } from '../../clients/dto/create-customer.dto';
+import {
+  IsNotEmpty,
+  IsUUID,
+  IsString,
+  IsOptional,
+  IsDateString,
+  ValidateNested,
+  IsBoolean,
+  Equals,
+  IsDefined,
+  IsObject,
+} from 'class-validator';
 import { Transform, Type } from 'class-transformer';
+import { CreateCustomerDto } from '../../clients/dto/create-customer.dto';
 
-class ClientInfo {
-  @IsEmail()
-  @IsNotEmpty()
-  email: string;
-
-  @IsString()
-  @IsNotEmpty()
-  firstName: string;
-
-  @IsString()
-  @IsNotEmpty()
-  lastName: string;
-
-  @Transform(({ value }) => normalizePhone(value))
-  @IsString()
-  @Matches(/^\+[1-9]\d{1,14}$/)
-  phone: string;
-
-  @IsBoolean()
-  @IsOptional()
-  termsAccepted?: boolean;
-}
-
-export class CreateAppointmentDto {
+class AppointmentFieldsDto {
   @IsUUID()
   @IsNotEmpty()
   branchId: string;
-
   @IsUUID()
   @IsNotEmpty()
   serviceId: string;
-
   @IsDateString()
   @IsNotEmpty()
-  startTime: string; // ISO String normalized to HH:00
-
+  startTime: string;
   @IsString()
   @IsOptional()
   notes?: string;
-
-  @IsOptional()
+}
+export class CreateAppointmentDto extends AppointmentFieldsDto {
+  @IsUUID()
+  @IsNotEmpty()
+  customerId: string;
+}
+export class CreatePublicAppointmentDto extends AppointmentFieldsDto {
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim().toLowerCase() : value,
+  )
+  @IsString()
+  @IsNotEmpty()
+  slug: string;
+  @IsDefined()
+  @IsObject()
   @ValidateNested()
-  @Type(() => ClientInfo)
-  clientInfo?: ClientInfo;
+  @Type(() => CreateCustomerDto)
+  clientInfo: CreateCustomerDto;
+  @IsDefined()
+  @IsBoolean()
+  @Equals(true, { message: 'Debe aceptar los términos para reservar.' })
+  termsAccepted: true;
 }

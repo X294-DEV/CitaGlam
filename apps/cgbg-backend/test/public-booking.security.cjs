@@ -56,7 +56,7 @@ test('S0-02: reserva pública y respuestas de usuarios sin secretos', async (t) 
     });
     const date = new Date();
     date.setUTCDate(date.getUTCDate() + 2);
-    date.setUTCHours(10, 0, 0, 0);
+    date.setUTCHours(16, 0, 0, 0);
     await prisma.businessSchedule.create({
       data: { branchId: branch.id, dayOfWeek: date.getUTCDay(), openTime: '09:00', closeTime: '18:00' },
     });
@@ -65,26 +65,29 @@ test('S0-02: reserva pública y respuestas de usuarios sin secretos', async (t) 
         tenantId, email: email('admin'), firstName: 'Admin', lastName: 'Original',
         role: 'ADMIN', isActive: true, password: await argon2.hash(password),
         activationToken: randomUUID(), resetPasswordToken: randomUUID(),
-        profile: { create: { phone: '5550000001' } },
+        profile: { create: { phone: '+525500000001' } },
       },
       include: { profile: true },
     });
     const booking = {
+      slug: `s0-02-${suffix}`, termsAccepted: true,
       branchId: branch.id, serviceId: service.id, startTime: date.toISOString(),
       clientInfo: {
         email: email('normal'), firstName: 'Cliente', lastName: 'Ficticio',
-        phone: '5550000002', termsAccepted: true,
+        phone: '+525500000002',
       },
     };
 
-    await t.test('ADMIN recibe 409 y no cambia ningún campo ni crea citas', async () => {
+    await t.test('reservar con email de ADMIN no modifica User ni expone su identidad', async () => {
+      const earlier = new Date(date); earlier.setUTCHours(15);
       const result = await api('/appointments/public', 'POST', {
-        ...booking, clientInfo: { ...booking.clientInfo, email: admin.email },
+        ...booking, startTime: earlier.toISOString(), clientInfo: { ...booking.clientInfo, email: admin.email },
       });
-      assert.equal(result.status, 409);
+      assert.equal(result.status, 201);
       assertNoSecrets(result.body);
+      assert.ok(!('customer' in result.body) && !('client' in result.body));
       assert.deepEqual(await prisma.user.findUnique({ where: { id: admin.id }, include: { profile: true } }), admin);
-      assert.equal(await prisma.appointment.count({ where: { tenantId } }), 0);
+      assert.equal(await prisma.appointment.count({ where: { tenantId } }), 1);
     });
 
     let clientId;
@@ -92,30 +95,24 @@ test('S0-02: reserva pública y respuestas de usuarios sin secretos', async (t) 
       const result = await api('/appointments/public', 'POST', booking);
       assert.equal(result.status, 201);
       assertNoSecrets(result.body);
-      assert.deepEqual(Object.keys(result.body.client).sort(), ['firstName', 'id', 'lastName']);
-      assert.deepEqual(Object.keys(result.body.tenant).sort(), ['id', 'logoUrl', 'name', 'slug']);
-      clientId = result.body.client.id;
+      assert.ok(!('customer' in result.body) && !('client' in result.body) && !('tenantId' in result.body));
+      clientId = (await prisma.appointment.findUnique({ where: { id: result.body.id } })).customerId;
       // Evidencia para el PR: datos exclusivamente ficticios, sin credenciales.
       console.log('Reserva normal (HTTP 201):', JSON.stringify(result.body));
     });
 
-    await t.test('CLIENT existente conserva nombre, teléfono y secretos internos', async () => {
+    await t.test('Customer existente conserva nombre y teléfono sin revelar datos', async () => {
       assert.ok(clientId);
-      await prisma.user.update({ where: { id: clientId }, data: {
-        password: await argon2.hash(password), activationToken: randomUUID(), resetPasswordToken: randomUUID(),
-      } });
-      const before = await prisma.user.findUnique({ where: { id: clientId }, include: { profile: true } });
-      const later = new Date(date);
-      later.setUTCHours(11);
+      const before = await prisma.customer.findUnique({ where: { id: clientId } });
+      const later = new Date(date); later.setUTCHours(17);
       const result = await api('/appointments/public', 'POST', {
         ...booking, startTime: later.toISOString(),
-        clientInfo: { ...booking.clientInfo, firstName: 'Reemplazo', lastName: 'Ajeno', phone: '5559999999' },
+        clientInfo: { ...booking.clientInfo, firstName: 'Reemplazo', lastName: 'Ajeno' },
       });
       assert.equal(result.status, 201);
       assertNoSecrets(result.body);
-      assert.equal(result.body.client.id, clientId);
-      assert.equal(result.body.client.firstName, 'Cliente');
-      assert.deepEqual(await prisma.user.findUnique({ where: { id: clientId }, include: { profile: true } }), before);
+      assert.equal((await prisma.appointment.findUnique({ where: { id: result.body.id } })).customerId, clientId);
+      assert.deepEqual(await prisma.customer.findUnique({ where: { id: clientId } }), before);
     });
 
     await t.test('registro público rechaza tenantId ajeno sin crear una cuenta', async () => {
@@ -143,13 +140,10 @@ test('S0-02: reserva pública y respuestas de usuarios sin secretos', async (t) 
       assert.equal(staff.status, 201);
       assertNoSecrets(staff.body);
       const manual = await api('/clients', 'POST', {
-        email: email('manual'), firstName: 'Manual', lastName: 'Ficticio',
+        email: email('manual'), firstName: 'Manual', lastName: 'Ficticio', phone: '+525500000003',
       }, token);
       assert.equal(manual.status, 201);
       assertNoSecrets(manual.body);
-      await prisma.user.update({ where: { id: manual.body.id }, data: {
-        activationToken: randomUUID(), resetPasswordToken: randomUUID(),
-      } });
       for (const path of ['/clients', `/clients/${manual.body.id}`, '/users/staff', '/appointments/merchant']) {
         const result = await api(path, 'GET', undefined, token);
         assert.equal(result.status, 200, path);
@@ -204,7 +198,7 @@ test('S0-02: reserva pública y respuestas de usuarios sin secretos', async (t) 
         userId: admin.id, tenantId, title: 'Propia', message: 'Ficticia',
       } });
       const peer = await prisma.notification.create({ data: {
-        userId: clientId, tenantId, title: 'Ajena', message: 'Ficticia',
+        userId: (await prisma.user.findUnique({ where: { email: email('staff') } })).id, tenantId, title: 'Ajena', message: 'Ficticia',
       } });
       const foreign = await prisma.notification.create({ data: {
         userId: admin.id, tenantId: randomUUID(), title: 'Otro negocio', message: 'Ficticia',
@@ -234,6 +228,7 @@ test('S0-02: reserva pública y respuestas de usuarios sin secretos', async (t) 
     await prisma.notification.deleteMany({ where: { userId: { in: users.map((u) => u.id) } } });
     await prisma.refreshToken.deleteMany({ where: { user: { email: { in: createdEmails } } } });
     await prisma.profile.deleteMany({ where: { user: { email: { in: createdEmails } } } });
+    if (tenantId) await prisma.customer.deleteMany({ where: { tenantId } });
     await prisma.user.deleteMany({ where: { email: { in: createdEmails } } });
     if (tenantId) await prisma.tenant.delete({ where: { id: tenantId } });
     if (packageId) await prisma.subscriptionPackage.delete({ where: { id: packageId } });

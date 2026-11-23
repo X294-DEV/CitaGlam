@@ -58,12 +58,16 @@ test('S1-01: migración poblada, rollback y clientes aislados por tenant', async
     assert.equal(await db.customer.count({ where: { userId: u } }), 2);
     assert.equal(await db.customer.count({ where: { userId: orphan } }), 0);
     assert.equal(await db.user.count({ where: { id: { in: [u, orphan] } } }), 2);
-    const preserved = await db.appointment.findUnique({ where: { id: a }, include: { customer: true } });
+    const preserved = await db.appointment.findUnique({ where: { id: a }, select: { customer: true, startTime: true, endTime: true } });
     assert.ok(require('class-validator').isUUID(preserved.customer.id), 'Los IDs migrados deben pasar la validación UUID del panel.');
     assert.equal(preserved.customer.tenantId, t);
     assert.equal(preserved.customer.userId, u);
     assert.equal(preserved.customer.phone, '+525500000001');
     assert.equal(preserved.startTime.toISOString(), '2026-12-01T10:00:00.000Z');
+    // En ramas dependientes, aplicar las migraciones posteriores antes de arrancar su API.
+    for (const dir of fs.readdirSync(migrationRoot).filter(n => /^\d/.test(n) && n > '20261123093000_customer_per_tenant').sort()) {
+      sql(fs.readFileSync(path.join(migrationRoot, dir, 'migration.sql'), 'utf8'));
+    }
     const password = randomBytes(12).toString('hex');
     const hashed = await argon2.hash(password);
     for (const [tenantId, email] of [[t,'admin-a@example.test'],[t2,'admin-b@example.test']]) {

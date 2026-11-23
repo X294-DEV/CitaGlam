@@ -1,26 +1,30 @@
-import { saveWithSlotConflict } from './slot-conflict';
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { normalizePhone } from '../clients/dto/create-customer.dto';
 import { PrismaService } from '@cgbg/prisma';
+import { Prisma } from '@prisma/client';
 import { EmailProvider } from '@cgbg/email';
 import { addHours } from 'date-fns';
-import { parseInstant, localDate, localTime, displayDate } from './time-zone';
-import { CreateAppointmentDto } from './dto/create-appointment.dto';
+import {
+  CreateAppointmentDto,
+  CreatePublicAppointmentDto,
+} from './dto/create-appointment.dto';
 import { RescheduleAppointmentDto } from './dto/reschedule-appointment.dto';
 import { UpdateAppointmentStatusDto } from './dto/update-appointment-status.dto';
 import { AvailabilityService } from './availability.service';
 import { MessagingService } from '../messaging/messaging.service';
-
-const publicClientSelect = { id: true, firstName: true, lastName: true } as const;
-const panelClientSelect = { ...publicClientSelect, email: true } as const;
-const tenantSelect = { id: true, name: true, slug: true, logoUrl: true } as const;
+import { parseInstant, localDate, localTime, displayDate } from './time-zone';
+import { saveWithSlotConflict } from './slot-conflict';
+import {
+  appointmentInclude,
+  AppointmentRecord,
+  toAppointmentDto,
+  toPublicAppointment,
+} from './appointment.select';
 
 @Injectable()
 export class AppointmentsService {
@@ -31,398 +35,347 @@ export class AppointmentsService {
     @Inject('EmailProvider') private emailProvider: EmailProvider,
   ) {}
 
-  async create(dto: CreateAppointmentDto, authenticatedClientId?: string) {
-    const service = await this.prisma.service.findUnique({
-      where: { id: dto.serviceId },
-    });
-    if (!service) throw new NotFoundException('Servicio no encontrado.');
-
-    const branch = await this.prisma.branch.findUnique({
-      where: { id: dto.branchId },
-      select: { tenantId: true, timezone: true },
-    });
-    if (!branch || branch.tenantId !== service.tenantId) {
-      throw new NotFoundException('Sucursal no encontrada.');
-    }
-
-    const linkedCustomer = authenticatedClientId ? await this.prisma.customer.findFirst({
-      where: { userId: authenticatedClientId, tenantId: service.tenantId }, select: { id: true },
-    }) : null;
-    if (authenticatedClientId && !linkedCustomer) throw new NotFoundException('Cliente no encontrado en este negocio.');
-    let finalClientId = linkedCustomer?.id;
-
-    if (!finalClientId) {
-      if (!dto.clientInfo) {
-        throw new ForbiddenException('Se requiere información del cliente para la reserva.');
-      }
-
-      if (!dto.clientInfo.termsAccepted) {
-        throw new ForbiddenException('Debe aceptar los términos y condiciones para continuar.');
-      }
-
-      const phone = normalizePhone(dto.clientInfo.phone) as string;
-      const customer = await this.prisma.customer.upsert({
-        where: { tenantId_phone: { tenantId: service.tenantId, phone } }, update: {},
-        create: { tenantId: service.tenantId, phone, email: dto.clientInfo.email,
-          firstName: dto.clientInfo.firstName, lastName: dto.clientInfo.lastName },
-        select: { id: true },
-      });
-      finalClientId = customer.id;
-    }
-
+  private async bookingContext(
+    dto: { branchId: string; serviceId: string; startTime: string },
+    tenantId: string,
+  ) {
     const startTime = parseInstant(dto.startTime);
-
-    const availableSlots = await this.availability.getAvailableSlots(
-      dto.branchId,
-      dto.serviceId,
+    const service = await this.prisma.service.findFirst({
+      where: { id: dto.serviceId, tenantId },
+    });
+    const branch = await this.prisma.branch.findFirst({
+      where: { id: dto.branchId, tenantId },
+    });
+    if (!service || !branch)
+      throw new NotFoundException('Servicio o sucursal no encontrados.');
+    const slots = await this.availability.getAvailableSlots(
+      branch.id,
+      service.id,
       localDate(startTime, branch.timezone),
     );
-    const requestHour = localTime(startTime, branch.timezone);
+    const slot = slots.find((s) => s.startTime === startTime.toISOString());
+    if (!slot)
+      throw new ConflictException(
+        'El horario seleccionado ya no está disponible.',
+      );
+    return { service, branch, startTime, endTime: new Date(slot.endTime) };
+  }
 
-    const selectedSlot = availableSlots.find(slot => slot.startTime === startTime.toISOString());
-    if (!selectedSlot) {
-      throw new ConflictException('El horario seleccionado ya no está disponible.');
-    }
-
-    const appointment = await saveWithSlotConflict(() => this.prisma.appointment.create({
-      data: {
-        tenantId: service.tenantId,
-        branchId: dto.branchId,
-        serviceId: dto.serviceId,
-        customerId: finalClientId,
-        startTime,
-        endTime: new Date(selectedSlot.endTime),
-        paymentExpiry: addHours(new Date(), 24),
-        status: 'PENDING_PAYMENT',
-        notes: dto.notes,
-        payment: {
-          create: {
-            amount: service.price,
-            method: 'TRANSFER',
-          },
-        },
+  private creationData(
+    dto: { notes?: string },
+    context: Awaited<ReturnType<AppointmentsService['bookingContext']>>,
+    customerId: string,
+    termsAcceptedAt: Date | null,
+  ) {
+    return {
+      tenantId: context.service.tenantId,
+      branchId: context.branch.id,
+      serviceId: context.service.id,
+      customerId,
+      startTime: context.startTime,
+      endTime: context.endTime,
+      notes: dto.notes,
+      termsAcceptedAt,
+      paymentExpiry: addHours(new Date(), 24),
+      status: 'PENDING_PAYMENT' as const,
+      payment: {
+        create: { amount: context.service.price, method: 'TRANSFER' as const },
       },
-      include: {
-        tenant: { select: tenantSelect },
-        customer: { select: publicClientSelect },
-        service: true,
-        branch: true,
-        payment: true,
-      },
-    }));
+    };
+  }
 
+  async create(dto: CreateAppointmentDto, tenantId: string) {
+    const customer = await this.prisma.customer.findFirst({
+      where: { id: dto.customerId, tenantId },
+      select: { id: true },
+    });
+    if (!customer) throw new NotFoundException('Cliente no encontrado.');
+    const context = await this.bookingContext(dto, tenantId);
+    const record = await saveWithSlotConflict(() =>
+      this.prisma.appointment.create({
+        data: this.creationData(dto, context, customer.id, null),
+        include: appointmentInclude,
+      }),
+    );
+    await this.created(record);
+    return toAppointmentDto(record);
+  }
+
+  async createPublic(dto: CreatePublicAppointmentDto) {
+    if (dto.termsAccepted !== true)
+      throw new BadRequestException('Debe aceptar los términos para reservar.');
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { slug: dto.slug.toLowerCase() },
+      select: { id: true, isActive: true },
+    });
+    if (!tenant?.isActive)
+      throw new NotFoundException('Negocio no encontrado.');
+    const context = await this.bookingContext(dto, tenant.id);
+    if (!context.service.isActive)
+      throw new NotFoundException('Servicio no encontrado.');
+    const record = await saveWithSlotConflict(async () => {
+      for (let attempt = 0; ; attempt++) {
+        try {
+          return await this.prisma.$transaction(async (tx) => {
+            const customer = await tx.customer.upsert({
+              where: {
+                tenantId_phone: {
+                  tenantId: tenant.id,
+                  phone: dto.clientInfo.phone,
+                },
+              },
+              update: {},
+              create: {
+                tenantId: tenant.id,
+                firstName: dto.clientInfo.firstName,
+                lastName: dto.clientInfo.lastName,
+                email: dto.clientInfo.email,
+                phone: dto.clientInfo.phone,
+              },
+              select: { id: true },
+            });
+            return tx.appointment.create({
+              data: this.creationData(dto, context, customer.id, new Date()),
+              include: appointmentInclude,
+            });
+          });
+        } catch (error) {
+          if (
+            attempt === 0 &&
+            error instanceof Prisma.PrismaClientKnownRequestError &&
+            error.code === 'P2002' &&
+            JSON.stringify(error.meta?.target ?? '').includes('phone')
+          )
+            continue;
+          throw error;
+        }
+      }
+    });
+    await this.created(record);
+    return toPublicAppointment(record);
+  }
+
+  private async created(record: AppointmentRecord) {
     await this.messaging.emitAppointmentCreated({
-      appointmentId: appointment.id,
-      tenantId: appointment.tenantId,
-      customerId: appointment.customerId,
-      dateTime: appointment.startTime.toISOString(),
-      amount: appointment.payment?.amount?.toString() || service.price.toString(),
+      appointmentId: record.id,
+      tenantId: record.tenantId,
+      customerId: record.customerId,
+      dateTime: record.startTime.toISOString(),
+      amount:
+        record.payment?.amount.toString() ?? record.service.price.toString(),
     });
+    await this.notify(
+      record,
+      'appointment-pending',
+      `Reserva recibida: ${record.service.name} - ${record.tenant.name}`,
+    );
+  }
 
-    const client = await this.prisma.customer.findUniqueOrThrow({
-      where: { id: finalClientId },
-      select: { email: true },
-    });
-
+  private async notify(
+    record: AppointmentRecord,
+    template: string,
+    subject: string,
+    extra: Record<string, string> = {},
+  ) {
     try {
       await this.emailProvider.sendEmail({
-        to: client.email,
-        subject: `Reserva recibida: ${service.name} - ${appointment.tenant.name}`,
-        template: 'appointment-pending',
+        to: record.customer.email,
+        subject,
+        template,
         context: {
-          user_name: appointment.customer.firstName,
-          business_name: appointment.tenant.name,
-          service_name: service.name,
-          appointment_date: displayDate(startTime, appointment.branch.timezone),
-          appointment_time: requestHour,
+          user_name: record.customer.firstName,
+          business_name: record.tenant.name,
+          service_name: record.service.name,
+          appointment_date: displayDate(
+            record.startTime,
+            record.branch.timezone,
+          ),
+          appointment_time: localTime(record.startTime, record.branch.timezone),
+          ...extra,
         },
       });
     } catch (error) {
       console.warn('Appointment email skipped:', (error as Error).message);
     }
+  }
 
-    return appointment;
+  private async own(id: string, tenantId: string) {
+    const row = await this.prisma.appointment.findFirst({
+      where: { id, tenantId },
+      include: appointmentInclude,
+    });
+    if (!row) throw new NotFoundException('Cita no encontrada.');
+    return row;
+  }
+  private notes(notes: string | null, extra?: string) {
+    return [notes, extra].filter(Boolean).join('\n') || null;
   }
 
   async approve(id: string, tenantId: string) {
-    const appointment = await this.prisma.appointment.findUnique({
-      where: { id },
-      include: { customer: { select: panelClientSelect }, tenant: { select: tenantSelect }, branch: true, service: true, payment: true },
-    });
-
-    if (!appointment || appointment.tenantId !== tenantId) {
-      throw new NotFoundException('Cita no encontrada.');
-    }
-
-    if (appointment.status !== 'WAITING_APPROVAL') {
-      throw new BadRequestException('Solo se pueden autorizar citas con comprobante pendiente de aprobación.');
-    }
-
+    const row = await this.own(id, tenantId);
+    if (row.status !== 'WAITING_APPROVAL')
+      throw new BadRequestException(
+        'Solo se pueden autorizar citas con comprobante pendiente de aprobación.',
+      );
     const updated = await this.prisma.appointment.update({
-      where: { id },
+      where: { id, tenantId },
       data: {
         status: 'AUTHORIZED',
-        payment: appointment.payment
-          ? {
-              update: {
-                isApproved: true,
-                approvedAt: new Date(),
-              },
-            }
+        payment: row.payment
+          ? { update: { isApproved: true, approvedAt: new Date() } }
           : undefined,
       },
+      include: appointmentInclude,
     });
-
-    try {
-      await this.emailProvider.sendEmail({
-        to: appointment.customer.email,
-        subject: `¡Cita Confirmada! - ${appointment.tenant.name}`,
-        template: 'appointment-confirmation',
-        context: {
-          user_name: appointment.customer.firstName,
-          business_name: appointment.tenant.name,
-          service_name: appointment.service.name,
-          appointment_date: displayDate(appointment.startTime, appointment.branch.timezone),
-          appointment_time: localTime(appointment.startTime, appointment.branch.timezone),
-        },
-      });
-    } catch (error) {
-      console.warn('Appointment approval email skipped:', (error as Error).message);
-    }
-
-    return updated;
+    await this.notify(
+      updated,
+      'appointment-confirmation',
+      `¡Cita Confirmada! - ${row.tenant.name}`,
+    );
+    return toAppointmentDto(updated);
   }
-
   async reject(id: string, tenantId: string, reason?: string) {
-    const appointment = await this.prisma.appointment.findUnique({
-      where: { id },
-      include: { customer: { select: panelClientSelect }, tenant: { select: tenantSelect }, branch: true, service: true, payment: true },
-    });
-
-    if (!appointment || appointment.tenantId !== tenantId) {
-      throw new NotFoundException('Cita no encontrada.');
-    }
-
-    if (appointment.status !== 'WAITING_APPROVAL') {
-      throw new BadRequestException('Solo se pueden rechazar citas con comprobante pendiente de aprobación.');
-    }
-
+    const row = await this.own(id, tenantId);
+    if (row.status !== 'WAITING_APPROVAL')
+      throw new BadRequestException(
+        'Solo se pueden rechazar citas con comprobante pendiente de aprobación.',
+      );
     const updated = await this.prisma.appointment.update({
-      where: { id },
+      where: { id, tenantId },
       data: {
         status: 'CANCELLED',
-        notes: [appointment.notes, reason ? `Pago rechazado: ${reason}` : 'Pago rechazado por el negocio']
-          .filter(Boolean)
-          .join('\n'),
+        notes: this.notes(
+          row.notes,
+          reason
+            ? `Pago rechazado: ${reason}`
+            : 'Pago rechazado por el negocio',
+        ),
       },
+      include: appointmentInclude,
     });
-
-    try {
-      await this.emailProvider.sendEmail({
-        to: appointment.customer.email,
-        subject: `Comprobante rechazado - ${appointment.tenant.name}`,
-        template: 'appointment-rejected',
-        context: {
-          user_name: appointment.customer.firstName,
-          business_name: appointment.tenant.name,
-          service_name: appointment.service.name,
-          appointment_date: displayDate(appointment.startTime, appointment.branch.timezone),
-          appointment_time: localTime(appointment.startTime, appointment.branch.timezone),
-          reason: reason || 'El comprobante no pudo ser validado por el negocio.',
-        },
-      });
-    } catch (error) {
-      console.warn('Appointment rejection email skipped:', (error as Error).message);
-    }
-
-    return updated;
+    await this.notify(
+      updated,
+      'appointment-rejected',
+      `Comprobante rechazado - ${row.tenant.name}`,
+      {
+        reason: reason || 'El comprobante no pudo ser validado por el negocio.',
+      },
+    );
+    return toAppointmentDto(updated);
   }
-
   async cancel(id: string, tenantId: string) {
-    const appointment = await this.prisma.appointment.findUnique({
-      where: { id },
-      include: { customer: { select: panelClientSelect }, tenant: { select: tenantSelect }, branch: true, service: true },
-    });
-
-    if (!appointment || appointment.tenantId !== tenantId) {
-      throw new NotFoundException('Cita no encontrada.');
-    }
-
-    if (appointment.status === 'CANCELLED') {
-      throw new BadRequestException('La cita ya está cancelada.');
-    }
-
-    if (appointment.status === 'COMPLETED') {
-      throw new BadRequestException('No se puede cancelar una cita completada.');
-    }
-
+    const row = await this.own(id, tenantId);
+    if (row.status === 'CANCELLED' || row.status === 'COMPLETED')
+      throw new BadRequestException('No se puede cancelar esta cita.');
     const updated = await this.prisma.appointment.update({
-      where: { id },
+      where: { id, tenantId },
       data: {
         status: 'CANCELLED',
-        notes: [appointment.notes, 'Cita cancelada por el negocio'].filter(Boolean).join('\n'),
+        notes: this.notes(row.notes, 'Cita cancelada por el negocio'),
       },
+      include: appointmentInclude,
     });
-
-    try {
-      await this.emailProvider.sendEmail({
-        to: appointment.customer.email,
-        subject: `Cita cancelada - ${appointment.tenant.name}`,
-        template: 'appointment-cancelled',
-        context: {
-          user_name: appointment.customer.firstName,
-          business_name: appointment.tenant.name,
-          service_name: appointment.service.name,
-          appointment_date: displayDate(appointment.startTime, appointment.branch.timezone),
-          appointment_time: localTime(appointment.startTime, appointment.branch.timezone),
-        },
-      });
-    } catch (error) {
-      console.warn('Appointment cancellation email skipped:', (error as Error).message);
-    }
-
-    return updated;
+    await this.notify(
+      updated,
+      'appointment-cancelled',
+      `Cita cancelada - ${row.tenant.name}`,
+    );
+    return toAppointmentDto(updated);
   }
-
-  async updateStatus(id: string, dto: UpdateAppointmentStatusDto, tenantId: string) {
-    const appointment = await this.prisma.appointment.findUnique({
-      where: { id },
-      include: { customer: { select: panelClientSelect }, tenant: { select: tenantSelect }, branch: true, service: true, payment: true },
-    });
-
-    if (!appointment || appointment.tenantId !== tenantId) {
-      throw new NotFoundException('Cita no encontrada.');
-    }
-
-    if (dto.status === 'AUTHORIZED') {
-      return this.approve(id, tenantId);
-    }
-
-    if (dto.status === 'CANCELLED') {
-      return this.cancel(id, tenantId);
-    }
-
-    if (dto.status !== 'COMPLETED') {
-      throw new BadRequestException('Este cambio de estatus no está permitido desde el panel.');
-    }
-
-    if (appointment.status !== 'AUTHORIZED') {
-      throw new BadRequestException('Solo se pueden completar citas autorizadas.');
-    }
-
-    return this.prisma.appointment.update({
-      where: { id },
+  async updateStatus(
+    id: string,
+    dto: UpdateAppointmentStatusDto,
+    tenantId: string,
+  ) {
+    if (dto.status === 'AUTHORIZED') return this.approve(id, tenantId);
+    if (dto.status === 'CANCELLED') return this.cancel(id, tenantId);
+    const row = await this.own(id, tenantId);
+    if (dto.status !== 'COMPLETED' || row.status !== 'AUTHORIZED')
+      throw new BadRequestException(
+        'Solo se pueden completar citas autorizadas.',
+      );
+    const updated = await this.prisma.appointment.update({
+      where: { id, tenantId },
       data: {
         status: 'COMPLETED',
-        notes: [appointment.notes, dto.reason ? `Cierre: ${dto.reason}` : undefined]
-          .filter(Boolean)
-          .join('\n'),
+        notes: this.notes(
+          row.notes,
+          dto.reason ? `Cierre: ${dto.reason}` : undefined,
+        ),
       },
-      include: {
-        customer: { select: panelClientSelect },
-        service: true,
-        branch: true,
-        payment: true,
-      },
+      include: appointmentInclude,
     });
+    return toAppointmentDto(updated);
   }
-
-  async findPendingApprovalByTenant(tenantId: string) {
-    return this.prisma.appointment.findMany({
-      where: { tenantId, status: 'WAITING_APPROVAL' },
-      include: {
-        customer: { select: panelClientSelect },
-        service: true,
-        branch: true,
-        payment: true,
-      },
-      orderBy: { startTime: 'asc' },
-    });
-  }
-
-  async reschedule(id: string, dto: RescheduleAppointmentDto, tenantId: string) {
-    const appointment = await this.prisma.appointment.findFirst({
-      where: { id, tenantId },
-      include: { customer: { select: panelClientSelect }, tenant: { select: tenantSelect }, branch: true, service: true },
-    });
-
-    if (!appointment || appointment.tenantId !== tenantId) {
-      throw new NotFoundException('Cita no encontrada.');
-    }
-
-    if (!['PENDING_PAYMENT', 'WAITING_APPROVAL', 'AUTHORIZED'].includes(appointment.status)) {
-      throw new BadRequestException('Solo se pueden reprogramar citas pendientes o autorizadas.');
-    }
-
-    const newDate = parseInstant(dto.newStartTime);
-
-    const availableSlots = await this.availability.getAvailableSlots(
-      appointment.branchId,
-      appointment.serviceId,
-      localDate(newDate, appointment.branch.timezone),
-      appointment.id,
+  async reschedule(
+    id: string,
+    dto: RescheduleAppointmentDto,
+    tenantId: string,
+  ) {
+    const row = await this.own(id, tenantId);
+    if (
+      !['PENDING_PAYMENT', 'WAITING_APPROVAL', 'AUTHORIZED'].includes(
+        row.status,
+      )
+    )
+      throw new BadRequestException(
+        'Solo se pueden reprogramar citas pendientes o autorizadas.',
+      );
+    const start = parseInstant(dto.newStartTime);
+    const slots = await this.availability.getAvailableSlots(
+      row.branchId,
+      row.serviceId,
+      localDate(start, row.branch.timezone),
+      row.id,
     );
-    const requestHour = localTime(newDate, appointment.branch.timezone);
-
-    const selectedSlot = availableSlots.find(slot => slot.startTime === newDate.toISOString());
-    if (!selectedSlot) {
-      throw new ConflictException('El nuevo horario seleccionado no está disponible.');
-    }
-
-    const updated = await saveWithSlotConflict(() => this.prisma.appointment.update({
-      where: { id, tenantId },
-      data: {
-        startTime: newDate,
-        endTime: new Date(selectedSlot.endTime),
-        status: appointment.status,
+    const slot = slots.find((s) => s.startTime === start.toISOString());
+    if (!slot)
+      throw new ConflictException(
+        'El nuevo horario seleccionado no está disponible.',
+      );
+    const updated = await saveWithSlotConflict(() =>
+      this.prisma.appointment.update({
+        where: { id, tenantId },
+        data: { startTime: start, endTime: new Date(slot.endTime) },
+        include: appointmentInclude,
+      }),
+    );
+    await this.notify(
+      updated,
+      'appointment-rescheduled',
+      `Cambio de horario: ${row.tenant.name}`,
+      {
+        old_date: `${displayDate(row.startTime, row.branch.timezone)} ${localTime(row.startTime, row.branch.timezone)}`,
+        reason: dto.reason || 'Ajuste operativo del negocio',
       },
-    }));
-
-    try {
-      await this.emailProvider.sendEmail({
-        to: appointment.customer.email,
-        subject: `Cambio de horario: ${appointment.tenant.name}`,
-        template: 'appointment-rescheduled',
-        context: {
-          user_name: appointment.customer.firstName,
-          service_name: appointment.service.name,
-          business_name: appointment.tenant.name,
-          appointment_date: displayDate(newDate, appointment.branch.timezone),
-          appointment_time: requestHour,
-          old_date: `${displayDate(appointment.startTime, appointment.branch.timezone)} ${localTime(appointment.startTime, appointment.branch.timezone)}`,
-          reason: dto.reason || 'Ajuste operativo del negocio',
-        },
-      });
-    } catch (error) {
-      console.warn('Appointment reschedule email skipped:', (error as Error).message);
-    }
-
-    return updated;
+    );
+    return toAppointmentDto(updated);
   }
-
+  async findPendingApprovalByTenant(tenantId: string) {
+    return (
+      await this.prisma.appointment.findMany({
+        where: { tenantId, status: 'WAITING_APPROVAL' },
+        include: appointmentInclude,
+        orderBy: { startTime: 'asc' },
+      })
+    ).map(toAppointmentDto);
+  }
   async findAllByTenant(tenantId: string) {
-    return this.prisma.appointment.findMany({
-      where: { tenantId },
-      include: {
-        customer: { select: panelClientSelect },
-        service: true,
-        branch: true,
-        payment: true,
-      },
-      orderBy: { startTime: 'desc' },
-    });
+    return (
+      await this.prisma.appointment.findMany({
+        where: { tenantId },
+        include: appointmentInclude,
+        orderBy: { startTime: 'desc' },
+      })
+    ).map(toAppointmentDto);
   }
-
-  async findAllByClient(clientId: string, tenantId: string) {
-    return this.prisma.appointment.findMany({
-      where: { tenantId, customer: { userId: clientId, tenantId } },
-      include: {
-        tenant: { select: tenantSelect },
-        service: true,
-        branch: true,
-        payment: true,
-      },
-      orderBy: { startTime: 'desc' },
-    });
+  async findAllByClient(userId: string, tenantId: string) {
+    return (
+      await this.prisma.appointment.findMany({
+        where: { tenantId, customer: { userId, tenantId } },
+        include: appointmentInclude,
+        orderBy: { startTime: 'desc' },
+      })
+    ).map(toAppointmentDto);
   }
 }
