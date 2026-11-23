@@ -1,3 +1,4 @@
+import { validateTimeZone, validateLocalDate } from '../appointments/time-zone';
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '@cgbg/prisma';
 import { UpdateBranchDto } from './dto/update-branch.dto';
@@ -9,6 +10,7 @@ export class BranchesService {
   constructor(private prisma: PrismaService) {}
 
   async createBranch(dto: any, tenantId: string) {
+    if (dto.timezone !== undefined) validateTimeZone(dto.timezone);
     return this.prisma.branch.create({
       data: {
         ...dto,
@@ -42,6 +44,7 @@ export class BranchesService {
   }
 
   async updateBranch(id: string, dto: UpdateBranchDto, tenantId: string) {
+    if (dto.timezone !== undefined) validateTimeZone(dto.timezone);
     await this.findOne(id, tenantId);
 
     return this.prisma.branch.update({
@@ -103,7 +106,7 @@ export class BranchesService {
     return this.prisma.workException.create({
       data: {
         tenantId, // Scoped to tenant
-        exceptionDate: new Date(dto.exceptionDate),
+        exceptionDate: new Date(`${validateLocalDate(dto.exceptionDate)}T00:00:00Z`),
         reason: dto.reason,
         isFullDay: dto.isFullDay ?? true,
         startTime: dto.startTime,

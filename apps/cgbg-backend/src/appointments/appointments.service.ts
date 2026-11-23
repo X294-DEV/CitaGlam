@@ -8,7 +8,8 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '@cgbg/prisma';
 import { EmailProvider } from '@cgbg/email';
-import { addHours, format } from 'date-fns';
+import { addHours } from 'date-fns';
+import { parseInstant, localDate, localTime, displayDate } from './time-zone';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { RescheduleAppointmentDto } from './dto/reschedule-appointment.dto';
 import { UpdateAppointmentStatusDto } from './dto/update-appointment-status.dto';
@@ -36,7 +37,7 @@ export class AppointmentsService {
 
     const branch = await this.prisma.branch.findUnique({
       where: { id: dto.branchId },
-      select: { tenantId: true },
+      select: { tenantId: true, timezone: true },
     });
     if (!branch || branch.tenantId !== service.tenantId) {
       throw new NotFoundException('Sucursal no encontrada.');
@@ -75,15 +76,14 @@ export class AppointmentsService {
       finalClientId = user.id;
     }
 
-    const startTime = new Date(dto.startTime);
-    startTime.setUTCMinutes(0, 0, 0);
+    const startTime = parseInstant(dto.startTime);
 
     const availableSlots = await this.availability.getAvailableSlots(
       dto.branchId,
       dto.serviceId,
-      startTime.toISOString(),
+      localDate(startTime, branch.timezone),
     );
-    const requestHour = format(startTime, 'HH:00');
+    const requestHour = localTime(startTime, branch.timezone);
 
     if (!availableSlots.includes(requestHour)) {
       throw new ConflictException('El horario seleccionado ya no está disponible.');
@@ -138,7 +138,7 @@ export class AppointmentsService {
           user_name: appointment.client.firstName,
           business_name: appointment.tenant.name,
           service_name: service.name,
-          appointment_date: format(startTime, 'dd/MM/yyyy'),
+          appointment_date: displayDate(startTime, appointment.branch.timezone),
           appointment_time: requestHour,
         },
       });
@@ -152,7 +152,7 @@ export class AppointmentsService {
   async approve(id: string, tenantId: string) {
     const appointment = await this.prisma.appointment.findUnique({
       where: { id },
-      include: { client: { select: panelClientSelect }, tenant: { select: tenantSelect }, service: true, payment: true },
+      include: { client: { select: panelClientSelect }, tenant: { select: tenantSelect }, branch: true, service: true, payment: true },
     });
 
     if (!appointment || appointment.tenantId !== tenantId) {
@@ -187,8 +187,8 @@ export class AppointmentsService {
           user_name: appointment.client.firstName,
           business_name: appointment.tenant.name,
           service_name: appointment.service.name,
-          appointment_date: format(appointment.startTime, 'dd/MM/yyyy'),
-          appointment_time: format(appointment.startTime, 'HH:00'),
+          appointment_date: displayDate(appointment.startTime, appointment.branch.timezone),
+          appointment_time: localTime(appointment.startTime, appointment.branch.timezone),
         },
       });
     } catch (error) {
@@ -201,7 +201,7 @@ export class AppointmentsService {
   async reject(id: string, tenantId: string, reason?: string) {
     const appointment = await this.prisma.appointment.findUnique({
       where: { id },
-      include: { client: { select: panelClientSelect }, tenant: { select: tenantSelect }, service: true, payment: true },
+      include: { client: { select: panelClientSelect }, tenant: { select: tenantSelect }, branch: true, service: true, payment: true },
     });
 
     if (!appointment || appointment.tenantId !== tenantId) {
@@ -231,8 +231,8 @@ export class AppointmentsService {
           user_name: appointment.client.firstName,
           business_name: appointment.tenant.name,
           service_name: appointment.service.name,
-          appointment_date: format(appointment.startTime, 'dd/MM/yyyy'),
-          appointment_time: format(appointment.startTime, 'HH:00'),
+          appointment_date: displayDate(appointment.startTime, appointment.branch.timezone),
+          appointment_time: localTime(appointment.startTime, appointment.branch.timezone),
           reason: reason || 'El comprobante no pudo ser validado por el negocio.',
         },
       });
@@ -246,7 +246,7 @@ export class AppointmentsService {
   async cancel(id: string, tenantId: string) {
     const appointment = await this.prisma.appointment.findUnique({
       where: { id },
-      include: { client: { select: panelClientSelect }, tenant: { select: tenantSelect }, service: true },
+      include: { client: { select: panelClientSelect }, tenant: { select: tenantSelect }, branch: true, service: true },
     });
 
     if (!appointment || appointment.tenantId !== tenantId) {
@@ -278,8 +278,8 @@ export class AppointmentsService {
           user_name: appointment.client.firstName,
           business_name: appointment.tenant.name,
           service_name: appointment.service.name,
-          appointment_date: format(appointment.startTime, 'dd/MM/yyyy'),
-          appointment_time: format(appointment.startTime, 'HH:00'),
+          appointment_date: displayDate(appointment.startTime, appointment.branch.timezone),
+          appointment_time: localTime(appointment.startTime, appointment.branch.timezone),
         },
       });
     } catch (error) {
@@ -292,7 +292,7 @@ export class AppointmentsService {
   async updateStatus(id: string, dto: UpdateAppointmentStatusDto, tenantId: string) {
     const appointment = await this.prisma.appointment.findUnique({
       where: { id },
-      include: { client: { select: panelClientSelect }, tenant: { select: tenantSelect }, service: true, payment: true },
+      include: { client: { select: panelClientSelect }, tenant: { select: tenantSelect }, branch: true, service: true, payment: true },
     });
 
     if (!appointment || appointment.tenantId !== tenantId) {
@@ -348,7 +348,7 @@ export class AppointmentsService {
   async reschedule(id: string, dto: RescheduleAppointmentDto, tenantId: string) {
     const appointment = await this.prisma.appointment.findFirst({
       where: { id, tenantId },
-      include: { client: { select: panelClientSelect }, tenant: { select: tenantSelect }, service: true },
+      include: { client: { select: panelClientSelect }, tenant: { select: tenantSelect }, branch: true, service: true },
     });
 
     if (!appointment || appointment.tenantId !== tenantId) {
@@ -359,16 +359,15 @@ export class AppointmentsService {
       throw new BadRequestException('Solo se pueden reprogramar citas pendientes o autorizadas.');
     }
 
-    const newDate = new Date(dto.newStartTime);
-    newDate.setUTCMinutes(0, 0, 0);
+    const newDate = parseInstant(dto.newStartTime);
 
     const availableSlots = await this.availability.getAvailableSlots(
       appointment.branchId,
       appointment.serviceId,
-      newDate.toISOString(),
+      localDate(newDate, appointment.branch.timezone),
       appointment.id,
     );
-    const requestHour = format(newDate, 'HH:00');
+    const requestHour = localTime(newDate, appointment.branch.timezone);
 
     if (!availableSlots.includes(requestHour)) {
       throw new ConflictException('El nuevo horario seleccionado no está disponible.');
@@ -392,9 +391,9 @@ export class AppointmentsService {
           user_name: appointment.client.firstName,
           service_name: appointment.service.name,
           business_name: appointment.tenant.name,
-          appointment_date: format(newDate, 'dd/MM/yyyy'),
+          appointment_date: displayDate(newDate, appointment.branch.timezone),
           appointment_time: requestHour,
-          old_date: format(appointment.startTime, 'dd/MM/yyyy HH:00'),
+          old_date: `${displayDate(appointment.startTime, appointment.branch.timezone)} ${localTime(appointment.startTime, appointment.branch.timezone)}`,
           reason: dto.reason || 'Ajuste operativo del negocio',
         },
       });
