@@ -167,6 +167,7 @@ model Branch {
   address      String
   city         String?
   phone        String?
+  timezone     String             @default("America/Mexico_City")
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
   appointments Appointment[]
@@ -212,8 +213,8 @@ model Appointment {
   clientId  String
   branchId  String
   serviceId String
-  startTime DateTime
-  endTime   DateTime
+  startTime DateTime            @db.Timestamptz(3)
+  endTime   DateTime            @db.Timestamptz(3)
   paymentExpiry DateTime?
   status    AppointmentStatus @default(PENDING_PAYMENT)
   notes     String?

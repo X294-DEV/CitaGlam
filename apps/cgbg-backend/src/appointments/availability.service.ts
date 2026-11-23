@@ -1,108 +1,54 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@cgbg/prisma';
-import { startOfDay, endOfDay, addHours, format, parse, isValid } from 'date-fns';
+import { localTime, validateLocalDate, wallTime } from './time-zone';
 
 @Injectable()
 export class AvailabilityService {
   constructor(private prisma: PrismaService) {}
 
-  async getAvailableSlots(branchId: string, serviceId: string, dateStr: string, excludeAppointmentId?: string) {
-    const date = new Date(dateStr);
-    if (!isValid(date)) throw new NotFoundException('Fecha inválida.');
-
-    const service = await this.prisma.service.findUnique({
-      where: { id: serviceId }, select: { tenantId: true },
-    });
+  async getAvailableSlots(branchId: string, serviceId: string, date: string, excludeAppointmentId?: string) {
+    validateLocalDate(date);
+    const service = await this.prisma.service.findUnique({ where: { id: serviceId } });
     if (!service) throw new NotFoundException('Servicio no encontrado.');
-    const branch = await this.prisma.branch.findUnique({
-      where: { id: branchId }, select: { tenantId: true },
-    });
-    if (!branch || branch.tenantId !== service.tenantId) {
-      throw new NotFoundException('Sucursal no encontrada.');
+    const branch = await this.prisma.branch.findUnique({ where: { id: branchId } });
+    if (!branch || branch.tenantId !== service.tenantId) throw new NotFoundException('Sucursal no encontrada.');
+    const dayOfWeek = new Date(`${date}T12:00:00Z`).getUTCDay();
+    const schedule = await this.prisma.businessSchedule.findUnique({ where: { dayOfWeek_branchId: { branchId, dayOfWeek } } });
+    if (!schedule?.isOpen) return [];
+    const dayStart = await wallTime(this.prisma, date, '00:00', branch.timezone);
+    const next = new Date(`${date}T12:00:00Z`); next.setUTCDate(next.getUTCDate() + 1);
+    const dayEnd = await wallTime(this.prisma, next.toISOString().slice(0,10), '00:00', branch.timezone);
+    const appointments = await this.prisma.appointment.findMany({ where: {
+      tenantId: service.tenantId, branchId, id: excludeAppointmentId ? { not: excludeAppointmentId } : undefined,
+      startTime: { lt: dayEnd }, endTime: { gt: dayStart },
+      status: { in: ['PENDING_PAYMENT', 'WAITING_APPROVAL', 'AUTHORIZED'] },
+    }, select: { startTime: true, endTime: true } });
+    // exceptionDate es un marcador de fecha calendario, no un instante de cita.
+    const marker = new Date(`${date}T00:00:00Z`);
+    const exceptions = await this.prisma.workException.findMany({ where: { tenantId: service.tenantId,
+      exceptionDate: { gte: marker, lt: new Date(marker.getTime() + 86400000) },
+    } });
+    if (exceptions.some(e => e.isFullDay)) return [];
+    const blocked = [...appointments];
+    for (const e of exceptions) {
+      if (e.startTime && e.endTime) blocked.push({
+        startTime: await wallTime(this.prisma,date,e.startTime,branch.timezone),
+        endTime: await wallTime(this.prisma,date,e.endTime,branch.timezone),
+      });
     }
-
-    const dayOfWeek = date.getUTCDay(); // 0-6
-
-    // 1. Get Branch Schedule for the day
-    const schedule = await this.prisma.businessSchedule.findUnique({
-      where: {
-        dayOfWeek_branchId: { branchId, dayOfWeek },
-      },
-    });
-
-    if (!schedule || !schedule.isOpen) {
-      return []; // Closed
-    }
-
-    // 3. Get Exceptions for the day
-    const exceptions = await this.prisma.workException.findMany({
-      where: {
-        tenantId: service.tenantId,
-        exceptionDate: {
-          gte: startOfDay(date),
-          lte: endOfDay(date),
-        },
-      },
-    });
-
-    // 4. Get Existing Appointments (Confirmed or Pending)
-    const appointments = await this.prisma.appointment.findMany({
-      where: {
-        branchId,
-        tenantId: service.tenantId,
-        id: excludeAppointmentId ? { not: excludeAppointmentId } : undefined,
-        startTime: {
-          gte: startOfDay(date),
-          lte: endOfDay(date),
-        },
-        status: { in: ['PENDING_PAYMENT', 'WAITING_APPROVAL', 'AUTHORIZED'] },
-      },
-    });
-
-    // 5. Generate Hourly Slots for both ranges
     const slots: string[] = [];
-    
-    const checkRange = (startStr: string, endStr: string) => {
-      const startParts = startStr.split(':');
-      const endParts = endStr.split(':');
-      
-      let current = startOfDay(date);
-      current.setUTCHours(parseInt(startParts[0]), 0, 0, 0);
-
-      const end = startOfDay(date);
-      end.setUTCHours(parseInt(endParts[0]), 0, 0, 0);
-
-      while (current < end) {
-        const slotStr = format(current, 'HH:00');
-        
-        // Check exceptions
-        const isBlockedByException = exceptions.some(ex => {
-          if (ex.isFullDay) return true;
-          if (!ex.startTime || !ex.endTime) return false;
-          const exStart = parseInt(ex.startTime.split(':')[0]);
-          const exEnd = parseInt(ex.endTime.split(':')[0]);
-          const currentHour = current.getUTCHours();
-          return currentHour >= exStart && currentHour < exEnd;
-        });
-
-        // Check appointments
-        const isOccupied = appointments.some(app => app.startTime.getUTCHours() === current.getUTCHours());
-
-        if (!isBlockedByException && !isOccupied) {
-          slots.push(slotStr);
-        }
-        current = addHours(current, 1);
+    const ranges = [[schedule.openTime,schedule.closeTime]];
+    if (schedule.openTime2 && schedule.closeTime2) ranges.push([schedule.openTime2,schedule.closeTime2]);
+    for (const [open,close] of ranges) {
+      let start = await wallTime(this.prisma,date,open,branch.timezone);
+      const end = await wallTime(this.prisma,date,close,branch.timezone);
+      // Sprint 0 conserva una hora hasta implementar #32.
+      while (start.getTime() + 3600000 <= end.getTime()) {
+        const finish = new Date(start.getTime() + 3600000);
+        if (!blocked.some(b => start < b.endTime && finish > b.startTime)) slots.push(localTime(start,branch.timezone));
+        start = finish;
       }
-    };
-
-    // First Range
-    checkRange(schedule.openTime, schedule.closeTime);
-    
-    // Second Range (Optional Split Shift)
-    if (schedule.openTime2 && schedule.closeTime2) {
-      checkRange(schedule.openTime2, schedule.closeTime2);
     }
-
-    return slots;
+    return [...new Set(slots)];
   }
 }

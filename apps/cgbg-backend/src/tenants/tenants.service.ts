@@ -132,6 +132,7 @@ export class TenantsService {
     const tenant = await this.findActiveTenantBySlug(slug);
     return this.prisma.branch.findMany({
       where: { tenantId: tenant.id },
+      select: { id: true, name: true, address: true, city: true, phone: true, timezone: true },
       orderBy: { name: 'asc' },
     });
   }
