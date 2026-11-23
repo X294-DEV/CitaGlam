@@ -50,9 +50,9 @@ export class AppointmentsController {
   }
 
   @Get('mine')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard)
   async findMyAppointments(@CurrentUser() user: any) {
-    return this.appointmentsService.findAllByClient(user.id);
+    return this.appointmentsService.findAllByClient(user.id, user.tenantId);
   }
 
   @Get('merchant')

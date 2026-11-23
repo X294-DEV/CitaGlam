@@ -36,10 +36,9 @@ export class DashboardService {
       0,
     );
 
-    const newClientsItems = await this.prisma.user.count({
+    const newClientsItems = await this.prisma.customer.count({
         where: {
             tenantId,
-            role: 'CLIENT',
             createdAt: { gte: monthStart, lte: monthEnd }
         }
     });
