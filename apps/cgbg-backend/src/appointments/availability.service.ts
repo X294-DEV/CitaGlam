@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@cgbg/prisma';
-import { localTime, validateLocalDate, wallTime } from './time-zone';
+import { validateLocalDate, wallTime } from './time-zone';
+import type { AvailabilitySlot } from '@cgbg/shared-types';
 
 @Injectable()
 export class AvailabilityService {
@@ -10,6 +11,9 @@ export class AvailabilityService {
     validateLocalDate(date);
     const service = await this.prisma.service.findUnique({ where: { id: serviceId } });
     if (!service) throw new NotFoundException('Servicio no encontrado.');
+    if (!Number.isInteger(service.durationMin) || service.durationMin <= 0) {
+      throw new BadRequestException('La duración del servicio debe ser positiva.');
+    }
     const branch = await this.prisma.branch.findUnique({ where: { id: branchId } });
     if (!branch || branch.tenantId !== service.tenantId) throw new NotFoundException('Sucursal no encontrada.');
     const dayOfWeek = new Date(`${date}T12:00:00Z`).getUTCDay();
@@ -36,19 +40,22 @@ export class AvailabilityService {
         endTime: await wallTime(this.prisma,date,e.endTime,branch.timezone),
       });
     }
-    const slots: string[] = [];
+    const slots: AvailabilitySlot[] = [];
+    const duration = service.durationMin * 60000;
     const ranges = [[schedule.openTime,schedule.closeTime]];
     if (schedule.openTime2 && schedule.closeTime2) ranges.push([schedule.openTime2,schedule.closeTime2]);
     for (const [open,close] of ranges) {
       let start = await wallTime(this.prisma,date,open,branch.timezone);
       const end = await wallTime(this.prisma,date,close,branch.timezone);
-      // Sprint 0 conserva una hora hasta implementar #32.
-      while (start.getTime() + 3600000 <= end.getTime()) {
-        const finish = new Date(start.getTime() + 3600000);
-        if (!blocked.some(b => start < b.endTime && finish > b.startTime)) slots.push(localTime(start,branch.timezone));
+      // Aioria eligió inicios espaciados por la duración desde la apertura de cada turno.
+      while (start.getTime() + duration <= end.getTime()) {
+        const finish = new Date(start.getTime() + duration);
+        if (!blocked.some(b => start < b.endTime && finish > b.startTime)) {
+          slots.push({ startTime: start.toISOString(), endTime: finish.toISOString() });
+        }
         start = finish;
       }
     }
-    return [...new Set(slots)];
+    return [...new Map(slots.map(s => [s.startTime, s])).values()].sort((a,b) => a.startTime.localeCompare(b.startTime));
   }
 }

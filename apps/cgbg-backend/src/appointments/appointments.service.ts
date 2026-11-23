@@ -1,3 +1,4 @@
+import { saveWithSlotConflict } from './slot-conflict';
 import {
   BadRequestException,
   ConflictException,
@@ -85,18 +86,19 @@ export class AppointmentsService {
     );
     const requestHour = localTime(startTime, branch.timezone);
 
-    if (!availableSlots.includes(requestHour)) {
+    const selectedSlot = availableSlots.find(slot => slot.startTime === startTime.toISOString());
+    if (!selectedSlot) {
       throw new ConflictException('El horario seleccionado ya no está disponible.');
     }
 
-    const appointment = await this.prisma.appointment.create({
+    const appointment = await saveWithSlotConflict(() => this.prisma.appointment.create({
       data: {
         tenantId: service.tenantId,
         branchId: dto.branchId,
         serviceId: dto.serviceId,
         clientId: finalClientId,
         startTime,
-        endTime: addHours(startTime, 1),
+        endTime: new Date(selectedSlot.endTime),
         paymentExpiry: addHours(new Date(), 24),
         status: 'PENDING_PAYMENT',
         notes: dto.notes,
@@ -114,7 +116,7 @@ export class AppointmentsService {
         branch: true,
         payment: true,
       },
-    });
+    }));
 
     await this.messaging.emitAppointmentCreated({
       appointmentId: appointment.id,
@@ -369,18 +371,19 @@ export class AppointmentsService {
     );
     const requestHour = localTime(newDate, appointment.branch.timezone);
 
-    if (!availableSlots.includes(requestHour)) {
+    const selectedSlot = availableSlots.find(slot => slot.startTime === newDate.toISOString());
+    if (!selectedSlot) {
       throw new ConflictException('El nuevo horario seleccionado no está disponible.');
     }
 
-    const updated = await this.prisma.appointment.update({
+    const updated = await saveWithSlotConflict(() => this.prisma.appointment.update({
       where: { id, tenantId },
       data: {
         startTime: newDate,
-        endTime: addHours(newDate, 1),
+        endTime: new Date(selectedSlot.endTime),
         status: appointment.status,
       },
-    });
+    }));
 
     try {
       await this.emailProvider.sendEmail({
