@@ -8,7 +8,7 @@ import { AppointmentService, Appointment } from '../../../core/services/appointm
 import { BranchService, Branch } from '../../../core/services/branch.service';
 import { ServicesService, Service } from '../../../core/services/services.service';
 import { ClientService, Client } from '../../../core/services/client.service';
-import { localHour } from '../../../core/utils/branch-time';
+import { localDateKey, localHour } from '../../../core/utils/branch-time';
 import { ZonedDatePipe } from '../../../shared/zoned-date/zoned-date.pipe';
 
 @Component({
@@ -42,6 +42,8 @@ export class AppointmentModalComponent implements OnInit {
   availableSlots = signal<AvailabilitySlot[]>([]);
   /** Hora (0-23, en la zona de la sucursal) que se intenta preseleccionar al abrir desde una celda. */
   private preferredHour: number | null = null;
+  /** Clave de la última petición de horarios: descarta respuestas viejas que lleguen fuera de orden. */
+  private slotsRequestKey = '';
 
   /** Zona horaria con la que se muestran todas las horas del modal: la de la sucursal. */
   timezone = computed(() => {
@@ -122,8 +124,10 @@ export class AppointmentModalComponent implements OnInit {
         customerId: data.appointment.customerId,
         branchId: data.appointment.branchId,
         serviceId: data.appointment.serviceId,
+        date: localDateKey(data.appointment.startTime, data.appointment.branch.timezone),
         notes: data.appointment.notes ?? '',
       });
+      this.loadSlots();
     } else if (data?.date) {
       this.appointmentForm.patchValue({ date: data.date });
       this.loadSlots();
@@ -140,11 +144,17 @@ export class AppointmentModalComponent implements OnInit {
     const { branchId, serviceId, date } = this.appointmentForm.value;
     this.appointmentForm.patchValue({ startTime: '' });
     this.availableSlots.set([]);
-    if (!branchId || !serviceId || !date) return;
+    this.slotsRequestKey = `${branchId}|${serviceId}|${date}`;
+    if (!branchId || !serviceId || !date) {
+      this.slotsLoading.set(false);
+      return;
+    }
 
+    const requestKey = this.slotsRequestKey;
     this.slotsLoading.set(true);
     this.appointmentService.getAvailability(branchId, serviceId, date).subscribe({
       next: (slots) => {
+        if (requestKey !== this.slotsRequestKey) return;
         this.availableSlots.set(slots);
         this.slotsLoading.set(false);
         const timezone = this.timezone();
@@ -155,6 +165,7 @@ export class AppointmentModalComponent implements OnInit {
         }
       },
       error: (error) => {
+        if (requestKey !== this.slotsRequestKey) return;
         this.errorMessage.set(this.readErrorMessage(error, 'No se pudieron cargar los horarios disponibles.'));
         this.slotsLoading.set(false);
       },

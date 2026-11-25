@@ -5,7 +5,7 @@ import { AppointmentService, Appointment } from '../../core/services/appointment
 import { AppointmentModalComponent } from './appointment-modal/appointment-modal.component';
 import { BranchService, Branch } from '../../core/services/branch.service';
 import { dateFromKey, dayKeyOf, localDateKey, localHour, localTime, todayKey } from '../../core/utils/branch-time';
-import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays, addMonths, format, isSameDay, isSameMonth } from 'date-fns';
+import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays, addMonths, differenceInCalendarDays, format, isSameMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 interface CalendarDay {
@@ -54,7 +54,7 @@ export class CalendarComponent implements OnInit {
     } else if (view === 'month') {
       start = startOfWeek(startOfMonth(current), { weekStartsOn: 1 });
       const end = endOfWeek(endOfMonth(current), { weekStartsOn: 1 });
-      length = Math.ceil((end.getTime() - start.getTime()) / 86400000) + 1;
+      length = differenceInCalendarDays(end, start) + 1;
     } else {
       start = startOfWeek(current, { weekStartsOn: 1 });
       length = 7;
