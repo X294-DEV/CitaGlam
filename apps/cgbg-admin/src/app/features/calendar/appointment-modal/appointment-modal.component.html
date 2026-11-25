@@ -13,80 +13,103 @@
     <main class="modal-content">
       <form [formGroup]="appointmentForm" (ngSubmit)="save()">
         
-        <!-- CLIENT SECTION -->
-        <div class="section-group">
-          <label class="section-label">Información del Cliente</label>
-          <div class="form-grid">
-            <div class="form-group">
-              <label>Nombre(s)</label>
-              <div class="input-with-icon">
-                <i-lucide name="user" class="icon-sm"></i-lucide>
-                <input type="text" formControlName="clientFirstName" placeholder="Ej: Juan">
-              </div>
+        <!-- EDICIÓN: resumen de la cita (cliente y servicio no se cambian al reprogramar) -->
+        <div class="section-group" *ngIf="appointment() as app">
+          <label class="section-label">Cita actual</label>
+          <dl class="appointment-summary">
+            <div><dt>Cliente</dt><dd>{{ app.customer.firstName }} {{ app.customer.lastName }} · {{ app.customer.phone }}</dd></div>
+            <div><dt>Servicio</dt><dd>{{ app.service.name }} ({{ app.service.durationMin }} min)</dd></div>
+            <div>
+              <dt>Horario</dt>
+              <dd>
+                {{ app.startTime | zoned: app.branch.timezone : 'dateTime' }} –
+                {{ app.endTime | zoned: app.branch.timezone : 'time' }}
+                <small>(hora de {{ app.branch.name }})</small>
+              </dd>
             </div>
-            <div class="form-group">
-              <label>Apellido(s)</label>
-              <input type="text" formControlName="clientLastName" placeholder="Ej: Pérez">
+          </dl>
+        </div>
+
+        <!-- CREAR: cliente -->
+        <div class="section-group" *ngIf="!isEdit()">
+          <label class="section-label">Cliente</label>
+          <div class="form-group">
+            <label for="customerId">Cliente *</label>
+            <div class="input-with-icon">
+              <i-lucide name="user" class="icon-sm"></i-lucide>
+              <select id="customerId" formControlName="customerId">
+                <option value="" disabled>Selecciona un cliente</option>
+                <option *ngFor="let c of customers()" [value]="c.id">{{ c.firstName }} {{ c.lastName }} · {{ c.phone }}</option>
+              </select>
             </div>
-          </div>
-          <div class="form-grid">
-            <div class="form-group">
-              <label>Correo Electrónico</label>
-              <input type="email" formControlName="clientEmail" placeholder="juan@ejemplo.com">
-            </div>
-            <div class="form-group">
-              <label>Teléfono (Opcional)</label>
-              <input type="text" formControlName="clientPhone" placeholder="55 1234 5678">
-            </div>
+            <small class="field-hint" *ngIf="customers().length === 0">
+              Aún no hay clientes. <a routerLink="/admin/clients" (click)="close()">Registra uno en Clientes</a> y vuelve aquí.
+            </small>
           </div>
         </div>
 
-        <!-- APPOINTMENT SECTION -->
-        <div class="section-group">
+        <!-- SERVICIO -->
+        <div class="section-group" *ngIf="!isEdit()">
           <label class="section-label">Detalles del Servicio</label>
           <div class="form-grid">
             <div class="form-group">
-              <label>Servicio</label>
+              <label for="serviceId">Servicio *</label>
               <div class="input-with-icon">
                 <i-lucide name="scissors" class="icon-sm"></i-lucide>
-                <select formControlName="serviceId">
-                  <option value="" disabled selected>Selecciona un servicio</option>
-                  <option *ngFor="let s of services()" [value]="s.id">{{ s.name }} ({{ s.price | currency }})</option>
+                <select id="serviceId" formControlName="serviceId" (change)="loadSlots()">
+                  <option value="" disabled>Selecciona un servicio</option>
+                  <option *ngFor="let s of services()" [value]="s.id">{{ s.name }} · {{ s.durationMin }} min ({{ s.price | currency }})</option>
                 </select>
               </div>
             </div>
             <div class="form-group">
-              <label>Sucursal</label>
-              <select formControlName="branchId">
+              <label for="branchId">Sucursal</label>
+              <select id="branchId" formControlName="branchId" (change)="loadSlots()">
                 <option *ngFor="let b of branches()" [value]="b.id">{{ b.name }}</option>
               </select>
             </div>
           </div>
+        </div>
 
+        <!-- FECHA Y HORARIO (crear y reprogramar) -->
+        <div class="section-group" *ngIf="!isEdit() || canReschedule()">
+          <label class="section-label">{{ isEdit() ? 'Nuevo horario' : 'Fecha y horario' }}</label>
           <div class="form-grid date-time-grid">
             <div class="form-group">
-              <label>Fecha</label>
+              <label for="date">Fecha *</label>
               <div class="input-with-icon">
                 <i-lucide name="calendar" class="icon-sm"></i-lucide>
-                <input type="date" formControlName="date">
+                <input id="date" type="date" formControlName="date" (change)="loadSlots()">
               </div>
             </div>
             <div class="form-group">
-              <label>Hora (HH:00)</label>
+              <label for="startTime">Horario disponible *</label>
               <div class="input-with-icon">
                 <i-lucide name="clock" class="icon-sm"></i-lucide>
-                <select formControlName="startTime">
-                   <option *ngFor="let h of [8,9,10,11,12,13,14,15,16,17,18,19,20,21]" [value]="h.toString().padStart(2, '0') + ':00'">{{ h.toString().padStart(2, '0') + ':00' }}</option>
+                <select id="startTime" formControlName="startTime">
+                  <option value="" disabled>{{ slotsLoading() ? 'Buscando horarios…' : 'Elige un horario' }}</option>
+                  <option *ngFor="let slot of availableSlots()" [value]="slot.startTime">
+                    {{ slot.startTime | zoned: timezone() : 'time' }} – {{ slot.endTime | zoned: timezone() : 'time' }}
+                  </option>
                 </select>
               </div>
             </div>
           </div>
+          <small class="field-hint" *ngIf="timezone()">Horarios en la zona de la sucursal: {{ timezone() }}.</small>
+          <small class="field-hint" *ngIf="!slotsLoading() && availableSlots().length === 0 && appointmentForm.value.date && appointmentForm.value.serviceId">
+            No hay horarios disponibles ese día. Prueba con otra fecha.
+          </small>
 
-          <div class="form-group full-width">
-            <label>Notas o Requerimientos Especiales</label>
+          <div class="form-group full-width" *ngIf="isEdit()">
+            <label for="reason">Motivo (opcional)</label>
+            <input id="reason" type="text" formControlName="reason" placeholder="Ej: el cliente pidió cambiar de día">
+          </div>
+
+          <div class="form-group full-width" *ngIf="!isEdit()">
+            <label for="notes">Notas o Requerimientos Especiales</label>
             <div class="input-with-icon">
               <i-lucide name="align-left" class="icon-sm top-align"></i-lucide>
-              <textarea formControlName="notes" placeholder="Algún recordatorio o detalle extra..."></textarea>
+              <textarea id="notes" formControlName="notes" placeholder="Algún recordatorio o detalle extra..."></textarea>
             </div>
           </div>
         </div>
@@ -108,7 +131,11 @@
               <i-lucide *ngIf="!isLoading()" name="check" class="icon-xs"></i-lucide>
               {{ isLoading() ? 'Guardando...' : 'Confirmar Reserva' }}
             </button>
-            <button *ngIf="isEdit()" type="button" class="btn-primary" (click)="close()">Cerrar</button>
+            <button *ngIf="isEdit() && canReschedule()" type="submit" class="btn-primary" [disabled]="!appointmentForm.value.startTime || isLoading()">
+              <i-lucide *ngIf="!isLoading()" name="check" class="icon-xs"></i-lucide>
+              {{ isLoading() ? 'Guardando...' : 'Reprogramar' }}
+            </button>
+            <button *ngIf="isEdit() && !canReschedule()" type="button" class="btn-primary" (click)="close()">Cerrar</button>
           </div>
         </div>
       </form>

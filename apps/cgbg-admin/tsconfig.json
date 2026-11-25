@@ -14,7 +14,10 @@
     "importHelpers": true,
     "target": "ES2022",
     "module": "preserve",
-    "moduleResolution": "bundler"
+    "moduleResolution": "bundler",
+    "paths": {
+      "@cgbg/shared-types": ["../../libs/shared-types/src/index.ts"]
+    }
   },
   "angularCompilerOptions": {
     "enableI18nLegacyMessageIdFormat": false,

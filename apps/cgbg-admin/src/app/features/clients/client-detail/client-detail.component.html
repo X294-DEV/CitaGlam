@@ -75,19 +75,19 @@
              </div>
              <div class="timeline-body">
                 <div class="timeline-header">
-                  <span class="app-date">{{ app.startTime | date: 'EEEE d, MMMM yyyy' }}</span>
+                  <span class="app-date">{{ app.startTime | zoned: app.branch.timezone : 'dateLong' }}</span>
                   <span class="app-status-badge" [attr.data-status]="app.status">{{ app.status }}</span>
                 </div>
                 <div class="app-details">
                   <div class="service-info">
-                    <span class="dot" [style.background-color]="app.service?.color"></span>
-                    <span class="service-name">{{ app.service?.name }}</span>
-                    <span class="app-price">{{ app.service?.price | currency }}</span>
+                    <span class="dot" [style.background-color]="app.service.color"></span>
+                    <span class="service-name">{{ app.service.name }}</span>
+                    <span class="app-price">{{ app.service.price | currency }}</span>
                   </div>
                   <div class="branch-info">
                     <i-lucide name="calendar" class="icon-tiny"></i-lucide>
-                    <span>{{ app.branch?.name }}</span>
-                    <span class="app-time">• {{ app.startTime | date: 'HH:00' }}</span>
+                    <span>{{ app.branch.name }}</span>
+                    <span class="app-time">• {{ app.startTime | zoned: app.branch.timezone : 'time' }} – {{ app.endTime | zoned: app.branch.timezone : 'time' }}</span>
                   </div>
                 </div>
                 <p class="app-notes" *ngIf="app.notes">

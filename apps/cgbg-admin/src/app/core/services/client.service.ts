@@ -1,21 +1,11 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Appointment } from './appointment.service';
+import type { CreateCustomerRequest, CustomerDetail, CustomerListItem } from '@cgbg/shared-types';
 
-export interface Client {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone?: string;
-  totalSpent: number;
-  appointmentsCount: number;
-  lastVisit?: string | Date;
-  appointments?: Appointment[];
-  createdAt?: string | Date;
-  updatedAt?: string | Date;
-}
+/** Cliente final del negocio (Customer, S1-01). Tipos del contrato compartido. */
+export type Client = CustomerListItem;
+export type ClientDetail = CustomerDetail;
 
 import { EnvironmentService } from './environment.service';
 
@@ -36,11 +26,11 @@ export class ClientService {
     return this.http.get<Client[]>(this.apiUrl);
   }
 
-  getClient(id: string): Observable<Client> {
-    return this.http.get<Client>(`${this.apiUrl}/${id}`);
+  getClient(id: string): Observable<ClientDetail> {
+    return this.http.get<ClientDetail>(`${this.apiUrl}/${id}`);
   }
 
-  create(client: Partial<Client>): Observable<Client> {
+  create(client: CreateCustomerRequest): Observable<Client> {
     return this.http.post<Client>(this.apiUrl, client);
   }
 }

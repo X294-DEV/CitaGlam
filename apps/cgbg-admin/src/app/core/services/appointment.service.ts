@@ -2,41 +2,17 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
-export type AppointmentStatus = 'PENDING_PAYMENT' | 'WAITING_APPROVAL' | 'AUTHORIZED' | 'COMPLETED' | 'CANCELLED';
+import type {
+  AppointmentDto,
+  AppointmentStatus as ContractAppointmentStatus,
+  AvailabilityResponse,
+  CreateAppointmentRequest,
+  RescheduleAppointmentRequest,
+} from '@cgbg/shared-types';
 
-export interface Appointment {
-  id: string;
-  tenantId: string;
-  clientId: string;
-  branchId: string;
-  serviceId: string;
-  startTime: string | Date;
-  endTime: string | Date;
-  status: AppointmentStatus;
-  notes?: string;
-  client?: {
-    firstName: string;
-    lastName: string;
-    email: string;
-  };
-  service?: {
-    name: string;
-    color: string;
-    durationMin: number;
-    price: number;
-  };
-  branch?: {
-    name: string;
-    address: string;
-  };
-  payment?: {
-    id: string;
-    amount: number | string;
-    receiptUrl?: string;
-    isApproved: boolean;
-    approvedAt?: string | Date;
-  };
-}
+/** Tipos del contrato compartido (S1-05): ya no se mantienen interfaces locales. */
+export type AppointmentStatus = ContractAppointmentStatus;
+export type Appointment = AppointmentDto;
 
 import { EnvironmentService } from './environment.service';
 
@@ -65,7 +41,7 @@ export class AppointmentService {
     return this.http.get<Appointment>(`${this.apiUrl}/${id}`);
   }
 
-  create(dto: any): Observable<Appointment> {
+  create(dto: CreateAppointmentRequest): Observable<Appointment> {
     return this.http.post<Appointment>(this.apiUrl, dto);
   }
 
@@ -77,7 +53,7 @@ export class AppointmentService {
     return this.http.patch<Appointment>(`${this.apiUrl}/${id}/reject`, { reason });
   }
 
-  reschedule(id: string, dto: any): Observable<Appointment> {
+  reschedule(id: string, dto: RescheduleAppointmentRequest): Observable<Appointment> {
     return this.http.patch<Appointment>(`${this.apiUrl}/${id}/reschedule`, dto);
   }
 
@@ -89,8 +65,8 @@ export class AppointmentService {
     return this.http.delete<Appointment>(`${this.apiUrl}/${id}`);
   }
 
-  getAvailability(branchId: string, serviceId: string, date: string): Observable<string[]> {
-    return this.http.get<string[]>(`${this.apiUrl}/available`, {
+  getAvailability(branchId: string, serviceId: string, date: string): Observable<AvailabilityResponse> {
+    return this.http.get<AvailabilityResponse>(`${this.apiUrl}/available`, {
       params: { branchId, serviceId, date }
     });
   }

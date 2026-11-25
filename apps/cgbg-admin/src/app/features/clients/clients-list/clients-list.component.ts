@@ -29,7 +29,8 @@ export class ClientsListComponent implements OnInit {
     return this.clients().filter(c => 
       c.firstName.toLowerCase().includes(term) || 
       c.lastName.toLowerCase().includes(term) || 
-      c.email.toLowerCase().includes(term)
+      c.email.toLowerCase().includes(term) ||
+      c.phone.replace(/\s+/g, '').includes(term.replace(/\s+/g, ''))
     );
   });
 
