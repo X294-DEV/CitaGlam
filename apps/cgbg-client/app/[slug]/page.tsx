@@ -1,3 +1,5 @@
+import { notFound } from "next/navigation";
+import type { BranchDto, PublicServiceDto, PublicTenantDto } from "@cgbg/shared-types";
 import BookingForm from "../components/BookingForm";
 import ThemeInjector from "../components/ThemeInjector";
 
@@ -5,6 +7,7 @@ const internalApiUrl = process.env.API_INTERNAL_URL || "http://cgbg-backend:3001
 
 async function getJson<T>(path: string): Promise<T> {
   const res = await fetch(`${internalApiUrl}${path}`, { cache: "no-store" });
+  if (res.status === 404) notFound();
   if (!res.ok) throw new Error(`API error ${res.status}`);
   return res.json();
 }
@@ -16,9 +19,9 @@ export default async function TenantBookingPage({
 }) {
   const { slug } = await params;
   const [tenant, branches, services] = await Promise.all([
-    getJson<any>(`/tenants/config/${slug}`),
-    getJson<any[]>(`/tenants/public/${slug}/branches`),
-    getJson<any[]>(`/tenants/public/${slug}/services`),
+    getJson<PublicTenantDto>(`/tenants/config/${slug}`),
+    getJson<BranchDto[]>(`/tenants/public/${slug}/branches`),
+    getJson<PublicServiceDto[]>(`/tenants/public/${slug}/services`),
   ]);
 
   return (
@@ -36,7 +39,7 @@ export default async function TenantBookingPage({
               />
             ) : (
               <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--primary-color)] text-2xl font-bold text-white">
-                {tenant.name?.slice(0, 1) || "C"}
+                {tenant.name.slice(0, 1) || "C"}
               </div>
             )}
             <div>
