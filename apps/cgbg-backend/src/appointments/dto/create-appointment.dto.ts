@@ -9,6 +9,7 @@ import {
   Equals,
   IsDefined,
   IsObject,
+  MaxLength,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { CreateCustomerDto } from '../../clients/dto/create-customer.dto';
@@ -48,4 +49,9 @@ export class CreatePublicAppointmentDto extends AppointmentFieldsDto {
   @IsBoolean()
   @Equals(true, { message: 'Debe aceptar los términos para reservar.' })
   termsAccepted: true;
+  /** Token de Cloudflare Turnstile; obligatorio cuando hay clave secreta configurada. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  turnstileToken?: string;
 }

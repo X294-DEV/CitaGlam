@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Script from "next/script";
 import type {
   AvailabilityResponse,
   AvailabilitySlot,
@@ -15,14 +16,34 @@ import { COUNTRIES, toInternationalPhone } from "../lib/phone";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
+interface TurnstileApi {
+  render(
+    container: HTMLElement,
+    options: {
+      sitekey: string;
+      callback: (token: string) => void;
+      "expired-callback": () => void;
+      "error-callback": () => void;
+    },
+  ): string;
+  reset(widgetId: string): void;
+  remove(widgetId: string): void;
+}
+
+function getTurnstile(): TurnstileApi | undefined {
+  return (window as unknown as { turnstile?: TurnstileApi }).turnstile;
+}
+
 export default function BookingForm({
   slug,
   branches,
   services,
+  turnstileSiteKey,
 }: {
   slug: string;
   branches: BranchDto[];
   services: PublicServiceDto[];
+  turnstileSiteKey: string | null;
 }) {
   const [branchId, setBranchId] = useState(branches[0]?.id ?? "");
   const [serviceId, setServiceId] = useState(services[0]?.id ?? "");
@@ -36,6 +57,39 @@ export default function BookingForm({
   const [dial, setDial] = useState<string>(COUNTRIES[0].dial);
   const [status, setStatus] = useState("");
   const [confirmation, setConfirmation] = useState<PublicAppointmentResponse | null>(null);
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaReady, setCaptchaReady] = useState(false);
+  const captchaBox = useRef<HTMLDivElement>(null);
+  const widgetId = useRef<string | null>(null);
+
+  const showCaptcha = Boolean(turnstileSiteKey) && !confirmation;
+
+  useEffect(() => {
+    if (getTurnstile()) setCaptchaReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!showCaptcha || !captchaReady || !turnstileSiteKey || !captchaBox.current) return;
+    const turnstile = getTurnstile();
+    if (!turnstile) return;
+    widgetId.current = turnstile.render(captchaBox.current, {
+      sitekey: turnstileSiteKey,
+      callback: (token) => setCaptchaToken(token),
+      "expired-callback": () => setCaptchaToken(""),
+      "error-callback": () => setCaptchaToken(""),
+    });
+    return () => {
+      if (widgetId.current) getTurnstile()?.remove(widgetId.current);
+      widgetId.current = null;
+      setCaptchaToken("");
+    };
+  }, [showCaptcha, captchaReady, turnstileSiteKey]);
+
+  /** El token de Turnstile es de un solo uso: tras cada intento se pide uno nuevo. */
+  const resetCaptcha = useCallback(() => {
+    setCaptchaToken("");
+    if (widgetId.current) getTurnstile()?.reset(widgetId.current);
+  }, []);
 
   const branch = useMemo(
     () => branches.find((item) => item.id === branchId),
@@ -93,6 +147,10 @@ export default function BookingForm({
       setStatus("Debes aceptar los términos y condiciones para reservar.");
       return;
     }
+    if (turnstileSiteKey && !captchaToken) {
+      setStatus("Completa la verificación de seguridad.");
+      return;
+    }
     const phone = toInternationalPhone(dial, String(form.get("phone") ?? ""));
     if (!phone) {
       setStatus("Escribe un teléfono válido, solo con números.");
@@ -111,6 +169,7 @@ export default function BookingForm({
         phone,
       },
       termsAccepted: true,
+      ...(captchaToken ? { turnstileToken: captchaToken } : {}),
     };
 
     setSubmitting(true);
@@ -130,6 +189,7 @@ export default function BookingForm({
       setStatus((error as Error).message);
     } finally {
       setSubmitting(false);
+      resetCaptcha();
     }
   }
 
@@ -292,6 +352,17 @@ export default function BookingForm({
           Acepto términos y condiciones.
         </label>
       </div>
+
+      {turnstileSiteKey && (
+        <>
+          <Script
+            src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
+            strategy="afterInteractive"
+            onReady={() => setCaptchaReady(true)}
+          />
+          <div ref={captchaBox} className="mt-6 flex min-h-[65px] justify-center" />
+        </>
+      )}
 
       {status && <p className="mt-4 rounded-2xl bg-[#fff4e8] p-4 text-sm text-[#8a4b1f]">{status}</p>}
 
