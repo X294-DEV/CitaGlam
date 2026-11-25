@@ -1,29 +1,32 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { readApiError } from "../lib/api";
+import { formatDateTime } from "../lib/datetime";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
-function formatAppointmentDateTime(value: string) {
-  return new Intl.DateTimeFormat("es-MX", {
-    dateStyle: "full",
-    timeStyle: "short",
-    hour12: false,
-    timeZone: "UTC",
-  }).format(new Date(value));
+/** Respuesta de GET /receipts/validate/:token. Aún sin tipo compartido (issue #41). */
+interface ReceiptValidation {
+  tenantName: string;
+  serviceName: string;
+  branchName: string;
+  startTime: string;
+  amount: string | number;
+  /** Zona de la sucursal; la agrega el issue #41. Mientras no llegue no se muestra la hora. */
+  timezone?: string;
 }
 
 export default function ReceiptUploadForm({ token }: { token: string }) {
-  const [appointment, setAppointment] = useState<any>(null);
+  const [appointment, setAppointment] = useState<ReceiptValidation | null>(null);
   const [status, setStatus] = useState("Validando enlace...");
   const [done, setDone] = useState(false);
 
   useEffect(() => {
     fetch(`${apiUrl}/receipts/validate/${token}`)
       .then(async (res) => {
-        const body = await res.json();
-        if (!res.ok) throw new Error(body.message || "El enlace no es válido.");
-        setAppointment(body);
+        if (!res.ok) throw new Error(await readApiError(res, "El enlace no es válido."));
+        setAppointment((await res.json()) as ReceiptValidation);
         setStatus("");
       })
       .catch((error) => setStatus((error as Error).message));
@@ -38,8 +41,8 @@ export default function ReceiptUploadForm({ token }: { token: string }) {
         method: "POST",
         body: form,
       });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.message || "No se pudo subir el comprobante.");
+      if (!res.ok) throw new Error(await readApiError(res, "No se pudo subir el comprobante."));
+      const body = (await res.json()) as { message: string };
       setDone(true);
       setStatus(body.message);
     } catch (error) {
@@ -59,7 +62,9 @@ export default function ReceiptUploadForm({ token }: { token: string }) {
           <p><strong>Negocio:</strong> {appointment.tenantName}</p>
           <p><strong>Servicio:</strong> {appointment.serviceName}</p>
           <p><strong>Sucursal:</strong> {appointment.branchName}</p>
-          <p><strong>Fecha:</strong> {formatAppointmentDateTime(appointment.startTime)}</p>
+          {appointment.timezone && (
+            <p><strong>Fecha:</strong> {formatDateTime(appointment.startTime, appointment.timezone)}</p>
+          )}
           <p><strong>Monto:</strong> ${appointment.amount}</p>
         </div>
       )}
