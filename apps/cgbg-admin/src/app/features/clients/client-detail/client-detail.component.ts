@@ -1,13 +1,14 @@
 import { Component, OnInit, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
-import { ClientService, Client } from '../../../core/services/client.service';
+import { ClientService, ClientDetail } from '../../../core/services/client.service';
+import { ZonedDatePipe } from '../../../shared/zoned-date/zoned-date.pipe';
 import { LucideAngularModule, ArrowLeft, Mail, Phone, Calendar, DollarSign, MessageCircle, Clock, CheckCircle, XCircle } from 'lucide-angular';
 
 @Component({
   selector: 'app-client-detail',
   standalone: true,
-  imports: [CommonModule, LucideAngularModule, RouterModule],
+  imports: [CommonModule, LucideAngularModule, RouterModule, ZonedDatePipe],
   templateUrl: './client-detail.component.html',
   styleUrl: './client-detail.component.css'
 })
@@ -16,7 +17,7 @@ export class ClientDetailComponent implements OnInit {
   private router = inject(Router);
   private clientService = inject(ClientService);
 
-  client = signal<Client | null>(null);
+  client = signal<ClientDetail | null>(null);
   isLoading = signal(true);
 
   ngOnInit(): void {

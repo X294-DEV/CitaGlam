@@ -177,3 +177,6 @@
   .modal-panel { border-radius: 28px 28px 0 0; position: absolute; bottom: 0; }
   .form-grid { grid-template-columns: 1fr; }
 }
+
+.field-error { display: block; margin-top: 0.35rem; color: #c53030; font-size: 0.78rem; }
+.form-error { margin: 0 0 1rem; padding: 0.7rem 0.9rem; border-radius: 10px; background: #fff5f5; color: #c53030; font-size: 0.85rem; font-weight: 600; }

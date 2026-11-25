@@ -1,18 +1,22 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Appointment, AppointmentService, AppointmentStatus } from '../../../core/services/appointment.service';
 import { ProtectedFileService } from '../../../core/services/protected-file.service';
+import { localDateTime, localTime } from '../../../core/utils/branch-time';
+import { AppointmentModalComponent } from '../../calendar/appointment-modal/appointment-modal.component';
 
 @Component({
   selector: 'app-appointments-list',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, AppointmentModalComponent],
   templateUrl: './appointments-list.component.html',
   styleUrl: './appointments-list.component.css',
 })
 export class AppointmentsListComponent implements OnInit {
   private appointmentService = inject(AppointmentService);
   private protectedFiles = inject(ProtectedFileService);
+
+  @ViewChild('appointmentModal') appointmentModal!: AppointmentModalComponent;
 
   appointments = signal<Appointment[]>([]);
   pendingApproval = signal<Appointment[]>([]);
@@ -140,33 +144,17 @@ export class AppointmentsListComponent implements OnInit {
     });
   }
 
+  /** Reprogramar usa el mismo modal del calendario: horarios reales del backend, sin escribir horas a mano. */
   rescheduleAppointment(appointment: Appointment) {
-    const currentDate = new Date(appointment.startTime).toISOString().slice(0, 10);
-    const currentHour = `${new Date(appointment.startTime).getUTCHours().toString().padStart(2, '0')}:00`;
-    const date = window.prompt('Nueva fecha de la cita (YYYY-MM-DD):', currentDate);
-    if (!date) return;
-    const time = window.prompt('Nueva hora de la cita (HH:00):', currentHour);
-    if (!time) return;
-
     this.closeActionMenu();
-    this.actionLoadingId.set(appointment.id);
     this.errorMessage.set('');
     this.successMessage.set('');
+    this.appointmentModal.open({ appointment });
+  }
 
-    this.appointmentService.reschedule(appointment.id, {
-      newStartTime: `${date}T${time}:00.000Z`,
-      reason: 'Reprogramada desde el panel de citas',
-    }).subscribe({
-      next: () => {
-        this.successMessage.set('La cita fue reprogramada correctamente.');
-        this.actionLoadingId.set(null);
-        this.loadAppointments(false);
-      },
-      error: (error) => {
-        this.errorMessage.set(error?.error?.message || 'No se pudo reprogramar la cita.');
-        this.actionLoadingId.set(null);
-      },
-    });
+  onAppointmentChanged() {
+    this.successMessage.set('La cita se actualizó correctamente.');
+    this.loadAppointments(false);
   }
 
   completeAppointment(appointment: Appointment) {
@@ -220,13 +208,10 @@ export class AppointmentsListComponent implements OnInit {
     return appointment.status === 'WAITING_APPROVAL';
   }
 
-  formatDateTime(value: Date | string): string {
-    return new Intl.DateTimeFormat('es-MX', {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-      hour12: false,
-      timeZone: 'UTC',
-    }).format(new Date(value));
+  /** Fecha y horario de la cita en la zona de su sucursal, por ejemplo "23/11/2026 09:30 – 10:15". */
+  formatSchedule(appointment: Appointment): string {
+    const timezone = appointment.branch.timezone;
+    return `${localDateTime(appointment.startTime, timezone)} – ${localTime(appointment.endTime, timezone)}`;
   }
 
   statusLabel(status: AppointmentStatus): string {

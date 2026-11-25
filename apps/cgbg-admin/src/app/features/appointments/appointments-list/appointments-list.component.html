@@ -30,17 +30,17 @@
           <span class="status-pill" [attr.data-status]="appointment.status">
             {{ statusLabel(appointment.status) }}
           </span>
-          <h3>{{ appointment.service?.name }}</h3>
+          <h3>{{ appointment.service.name }}</h3>
           <p class="approval-client">
-            {{ appointment.client?.firstName }} {{ appointment.client?.lastName }}
-            <span>{{ appointment.client?.email }}</span>
+            {{ appointment.customer.firstName }} {{ appointment.customer.lastName }}
+            <span>{{ appointment.customer.email }}</span>
           </p>
         </div>
 
         <dl>
           <div>
             <dt>Fecha</dt>
-            <dd>{{ formatDateTime(appointment.startTime) }}</dd>
+            <dd>{{ formatSchedule(appointment) }}</dd>
           </div>
           <div>
             <dt>Monto</dt>
@@ -48,7 +48,7 @@
           </div>
           <div>
             <dt>Sucursal</dt>
-            <dd>{{ appointment.branch?.name || '-' }}</dd>
+            <dd>{{ appointment.branch.name || '-' }}</dd>
           </div>
         </dl>
 
@@ -91,8 +91,8 @@
     <header class="details-header">
       <div>
         <p class="eyebrow">Detalle de cita</p>
-        <h2>{{ selected.service?.name || 'Servicio' }}</h2>
-        <p>{{ selected.client?.firstName }} {{ selected.client?.lastName }} · {{ selected.client?.email }}</p>
+        <h2>{{ selected.service.name || 'Servicio' }}</h2>
+        <p>{{ selected.customer.firstName }} {{ selected.customer.lastName }} · {{ selected.customer.email }}</p>
       </div>
 
       <button class="close-details" type="button" (click)="closeDetails()">Cerrar</button>
@@ -101,7 +101,7 @@
     <div class="details-grid">
       <div class="detail-item">
         <span>Fecha y hora</span>
-        <strong>{{ formatDateTime(selected.startTime) }}</strong>
+        <strong>{{ formatSchedule(selected) }}</strong>
       </div>
       <div class="detail-item">
         <span>Estado</span>
@@ -109,7 +109,7 @@
       </div>
       <div class="detail-item">
         <span>Sucursal</span>
-        <strong>{{ selected.branch?.name || '-' }}</strong>
+        <strong>{{ selected.branch.name || '-' }}</strong>
       </div>
       <div class="detail-item">
         <span>Monto</span>
@@ -194,13 +194,13 @@
       </thead>
       <tbody>
         <tr *ngFor="let appointment of sortedAppointments()">
-          <td class="date-cell">{{ formatDateTime(appointment.startTime) }}</td>
+          <td class="date-cell">{{ formatSchedule(appointment) }}</td>
           <td>
-            <strong>{{ appointment.client?.firstName }} {{ appointment.client?.lastName }}</strong>
-            <span>{{ appointment.client?.email }}</span>
+            <strong>{{ appointment.customer.firstName }} {{ appointment.customer.lastName }}</strong>
+            <span>{{ appointment.customer.email }}</span>
           </td>
-          <td>{{ appointment.service?.name }}</td>
-          <td>{{ appointment.branch?.name || '-' }}</td>
+          <td>{{ appointment.service.name }}</td>
+          <td>{{ appointment.branch.name || '-' }}</td>
           <td>
             <span class="status-pill" [attr.data-status]="appointment.status">
               {{ statusLabel(appointment.status) }}
@@ -274,3 +274,5 @@
     </ng-template>
   </div>
 </section>
+
+<app-appointment-modal #appointmentModal (appointmentSaved)="onAppointmentChanged()"></app-appointment-modal>
