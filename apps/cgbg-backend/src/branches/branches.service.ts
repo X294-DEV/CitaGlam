@@ -1,3 +1,4 @@
+import { validateTimeZone, validateLocalDate } from '../appointments/time-zone';
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '@cgbg/prisma';
 import { UpdateBranchDto } from './dto/update-branch.dto';
@@ -9,6 +10,7 @@ export class BranchesService {
   constructor(private prisma: PrismaService) {}
 
   async createBranch(dto: any, tenantId: string) {
+    if (dto.timezone !== undefined) validateTimeZone(dto.timezone);
     return this.prisma.branch.create({
       data: {
         ...dto,
@@ -30,8 +32,8 @@ export class BranchesService {
   }
 
   async findOne(id: string, tenantId: string) {
-    const branch = await this.prisma.branch.findUnique({
-      where: { id },
+    const branch = await this.prisma.branch.findFirst({
+      where: { id, tenantId },
     });
 
     if (!branch || branch.tenantId !== tenantId) {
@@ -42,10 +44,11 @@ export class BranchesService {
   }
 
   async updateBranch(id: string, dto: UpdateBranchDto, tenantId: string) {
+    if (dto.timezone !== undefined) validateTimeZone(dto.timezone);
     await this.findOne(id, tenantId);
 
     return this.prisma.branch.update({
-      where: { id },
+      where: { id, tenantId },
       data: dto,
     });
   }
@@ -56,7 +59,7 @@ export class BranchesService {
     await this.findOne(branchId, tenantId);
 
     return this.prisma.businessSchedule.findMany({
-      where: { branchId },
+      where: { branchId, branch: { tenantId } },
       orderBy: { dayOfWeek: 'asc' },
     });
   }
@@ -103,7 +106,7 @@ export class BranchesService {
     return this.prisma.workException.create({
       data: {
         tenantId, // Scoped to tenant
-        exceptionDate: new Date(dto.exceptionDate),
+        exceptionDate: new Date(`${validateLocalDate(dto.exceptionDate)}T00:00:00Z`),
         reason: dto.reason,
         isFullDay: dto.isFullDay ?? true,
         startTime: dto.startTime,
@@ -124,8 +127,8 @@ export class BranchesService {
   }
 
   async removeException(id: string, tenantId: string) {
-    const exception = await this.prisma.workException.findUnique({
-      where: { id },
+    const exception = await this.prisma.workException.findFirst({
+      where: { id, tenantId },
     });
 
     if (!exception || exception.tenantId !== tenantId) {
@@ -133,7 +136,7 @@ export class BranchesService {
     }
 
     return this.prisma.workException.delete({
-      where: { id },
+      where: { id, tenantId },
     });
   }
 }

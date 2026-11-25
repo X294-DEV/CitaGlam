@@ -1,3 +1,4 @@
+import { appointmentInclude, toAppointmentDto } from '../appointments/appointment.select';
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@cgbg/prisma';
 import { Prisma } from '@prisma/client';
@@ -30,12 +31,13 @@ export class ClientsService {
       where: { id, tenantId },
       select: { ...customerSelect, appointments: {
         where: { tenantId }, orderBy: { startTime: 'desc' },
-        include: { service: true, branch: true },
+        include: appointmentInclude,
       } },
     });
     if (!customer) throw new NotFoundException('Cliente no encontrado.');
     return {
       ...customer,
+      appointments: customer.appointments.map(toAppointmentDto),
       totalSpent: customer.appointments.filter(a => a.status === 'COMPLETED' || a.status === 'AUTHORIZED')
         .reduce((sum, a) => sum + Number(a.service.price), 0),
       appointmentsCount: customer.appointments.length,

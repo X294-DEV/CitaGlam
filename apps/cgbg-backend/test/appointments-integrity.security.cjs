@@ -45,30 +45,34 @@ test('S0-10: sucursal del negocio y reprogramación sin conflicto propio', async
     const client = await prisma.user.create({ data: {
       email: email('client'), firstName: 'Cliente', lastName: 'Ficticio', role: 'CLIENT', isActive: true,
     } });
+    const customer = await prisma.customer.create({ data: {
+      tenantId: tenantIds[0], userId: client.id, email: client.email,
+      firstName: client.firstName, lastName: client.lastName, phone: '+525500000011',
+    } });
     const login = await api('/auth/login', 'POST', { email: email('admin'), password });
     assert.equal(login.status, 200);
     const token = login.body.access_token;
     const date = new Date();
     date.setUTCDate(date.getUTCDate() + 2);
-    date.setUTCHours(10, 0, 0, 0);
+    date.setUTCHours(16, 0, 0, 0);
     for (const branch of branches) {
       await prisma.businessSchedule.create({ data: {
         branchId: branch.id, dayOfWeek: date.getUTCDay(), openTime: '09:00', closeTime: '18:00',
       } });
     }
     const appointment = await prisma.appointment.create({ data: {
-      tenantId: tenantIds[0], clientId: client.id, branchId: branches[0].id, serviceId: service.id,
+      tenantId: tenantIds[0], customerId: customer.id, branchId: branches[0].id, serviceId: service.id,
       startTime: date, endTime: new Date(date.getTime() + 3600000), status: 'PENDING_PAYMENT',
     } });
 
     await t.test('reserva y disponibilidad rechazan sucursal ajena o inexistente con 404', async () => {
       for (const branchId of [branches[1].id, randomUUID()]) {
         const booking = await api('/appointments/public', 'POST', {
-          branchId, serviceId: service.id, startTime: date.toISOString(),
-          clientInfo: { email: email('invalid'), firstName: 'Sin', lastName: 'Crear', termsAccepted: true },
+          slug: `s0-10-a-${suffix}`, termsAccepted: true, branchId, serviceId: service.id, startTime: date.toISOString(),
+          clientInfo: { email: email('invalid'), firstName: 'Sin', lastName: 'Crear', phone: '+525500000012' },
         });
         assert.equal(booking.status, 404);
-        const query = new URLSearchParams({ branchId, serviceId: service.id, date: date.toISOString() });
+        const query = new URLSearchParams({ branchId, serviceId: service.id, date: date.toISOString().slice(0,10) });
         assert.equal((await api(`/appointments/available?${query}`)).status, 404);
       }
       assert.equal(await prisma.user.count({ where: { email: email('invalid') } }), 0);
@@ -97,7 +101,7 @@ test('S0-10: sucursal del negocio y reprogramación sin conflicto propio', async
     await t.test('otra cita ocupada sigue causando 409 y otra pertenencia devuelve 404', async () => {
       const nextHour = new Date(date.getTime() + 3600000);
       await prisma.appointment.create({ data: {
-        tenantId: tenantIds[0], clientId: client.id, branchId: branches[0].id, serviceId: service.id,
+        tenantId: tenantIds[0], customerId: customer.id, branchId: branches[0].id, serviceId: service.id,
         startTime: nextHour, endTime: new Date(nextHour.getTime() + 3600000), status: 'AUTHORIZED',
       } });
       assert.equal((await api(`/appointments/${appointment.id}/reschedule`, 'PATCH', { newStartTime: nextHour.toISOString() }, token)).status, 409);
@@ -111,6 +115,7 @@ test('S0-10: sucursal del negocio y reprogramación sin conflicto propio', async
     await prisma.branch.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.service.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.refreshToken.deleteMany({ where: { user: { email: { in: emails } } } });
+    await prisma.customer.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.user.deleteMany({ where: { email: { in: emails } } });
     await prisma.tenant.deleteMany({ where: { id: { in: tenantIds } } });
     if (packageId) await prisma.subscriptionPackage.delete({ where: { id: packageId } });

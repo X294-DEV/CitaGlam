@@ -1,0 +1,46 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const {randomUUID,randomBytes}=require('node:crypto');
+const argon2=require('argon2');
+const {withLocalApiDatabase}=require('./local-api-fixture.cjs');
+
+test('S1-02: migración preserva hora local y API opera instantes con zona',async()=>{
+  await withLocalApiDatabase(13031,async({sql,migrate,start})=>{
+    migrate(n=>n<'20261123000000');
+    const p=randomUUID(),t=randomUUID(),u=randomUUID(),b=randomUUID(),s=randomUUID(),a=randomUUID();
+    sql(`INSERT INTO "SubscriptionPackage" (id,name,price,"updatedAt") VALUES ('${p}','Ficticio',100,now());
+      INSERT INTO "Tenant" (id,name,slug,"packageId","updatedAt") VALUES ('${t}','Negocio','tz-${t}','${p}',now());
+      INSERT INTO "User" (id,email,"firstName","lastName",role,"isActive","tenantId","updatedAt") VALUES ('${u}','tz@example.test','Ana','Ejemplo','CLIENT',true,'${t}',now());
+      INSERT INTO "Profile" (id,"userId",phone) VALUES ('${randomUUID()}','${u}','+525500000001');
+      INSERT INTO "Branch" (id,"tenantId",name,address,"updatedAt") VALUES ('${b}','${t}','Sucursal','Ficticia',now());
+      INSERT INTO "Service" (id,"tenantId",name,price,"updatedAt") VALUES ('${s}','${t}','Servicio',100,now());
+      INSERT INTO "Appointment" (id,"tenantId","clientId","branchId","serviceId","startTime","endTime",status,"updatedAt") VALUES ('${a}','${t}','${u}','${b}','${s}','2026-12-01 10:00','2026-12-01 11:00','AUTHORIZED',now());
+      INSERT INTO "BusinessSchedule" (id,"branchId","dayOfWeek","openTime","closeTime") VALUES ('${randomUUID()}','${b}',2,'09:00','18:00');`);
+    migrate(n=>n>='20261123000000');
+    const {db,api}=await start();
+    const migrated=await db.appointment.findUnique({where:{id:a}});
+    assert.equal(migrated.startTime.toISOString(),'2026-12-01T16:00:00.000Z');
+    assert.equal(migrated.endTime.toISOString(),'2026-12-01T17:00:00.000Z');
+    const password=randomBytes(12).toString('hex');
+    await db.user.create({data:{tenantId:t,email:'admin-tz@example.test',firstName:'Admin',lastName:'Ficticio',role:'ADMIN',isActive:true,password:await argon2.hash(password)}});
+    const token=(await api('/auth/login','POST',{email:'admin-tz@example.test',password})).body.access_token;
+    assert.ok(token);
+    const branches=await api(`/tenants/public/tz-${t}/branches`);
+    assert.equal(branches.status,200);assert.equal(branches.body[0].timezone,'America/Mexico_City');
+    const query=new URLSearchParams({branchId:b,serviceId:s,date:'2026-12-01'});
+    const available=await api(`/appointments/available?${query}`);
+    assert.equal(available.status,200);
+    const labels=available.body.map(x=>typeof x==='string'?x:new Intl.DateTimeFormat('en-GB',{timeZone:'America/Mexico_City',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(x.startTime)));
+    assert.ok(labels.includes('09:00'));assert.ok(!labels.includes('10:00'));
+    assert.equal((await api(`/appointments/${a}/reschedule`,'PATCH',{newStartTime:'2026-12-01T13:00:00'},token)).status,400);
+    const moved=await api(`/appointments/${a}/reschedule`,'PATCH',{newStartTime:'2026-12-01T13:00:00-06:00'},token);
+    assert.equal(moved.status,200);assert.equal(moved.body.startTime,'2026-12-01T19:00:00.000Z');
+    assert.equal((await api(`/branches/${b}`,'PATCH',{timezone:'zona-inexistente'},token)).status,400);
+    assert.equal((await api(`/branches/${b}`,'PATCH',{timezone:'America/Tijuana'},token)).status,200);
+    const pacific=await api(`/appointments/${a}/reschedule`,'PATCH',{newStartTime:'2026-12-01T10:00:00-08:00'},token);
+    assert.equal(pacific.status,200);assert.equal(pacific.body.startTime,'2026-12-01T18:00:00.000Z');
+    const badQuery=new URLSearchParams({branchId:b,serviceId:s,date:'2026-02-30'});
+    assert.equal((await api(`/appointments/available?${badQuery}`)).status,400);
+    console.log('Datos anteriores 10:00 -> 16:00Z; HTTP real con offsets MX/Tijuana, date puro y rechazo de zona/fecha inválida verificados.');
+  });
+});

@@ -18,4 +18,8 @@ export class UpdateBranchDto {
   @IsPhoneNumber()
   @IsOptional()
   phone?: string;
+  @IsString()
+  @IsNotEmpty()
+  @IsOptional()
+  timezone?: string;
 }

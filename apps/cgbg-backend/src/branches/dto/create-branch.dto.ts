@@ -16,4 +16,8 @@ export class CreateBranchDto {
   @IsString()
   @IsOptional()
   phone?: string;
+  @IsString()
+  @IsNotEmpty()
+  @IsOptional()
+  timezone?: string;
 }

@@ -1,0 +1,76 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const {randomUUID,randomBytes}=require('node:crypto');
+const argon2=require('argon2');
+const {withLocalApiDatabase}=require('./local-api-fixture.cjs');
+
+test('S1-04: Customer del tenant, consentimiento por cita y respuesta pública mínima',async()=>{
+  await withLocalApiDatabase(13033,async({sql,migrate,start})=>{
+    migrate(n=>n<'20261123000000');
+    const p=randomUUID(),t=randomUUID(),t2=randomUUID(),u=randomUUID(),b=randomUUID(),s=randomUUID(),legacy=randomUUID();
+    const slug=`book-${t}`;
+    sql(`INSERT INTO "SubscriptionPackage" (id,name,price,"updatedAt") VALUES ('${p}','Ficticio',100,now());
+      INSERT INTO "Tenant" (id,name,slug,"packageId","updatedAt") VALUES ('${t}','Negocio','${slug}','${p}',now()),('${t2}','Otro','otro-${t2}','${p}',now());
+      INSERT INTO "User" (id,email,"firstName","lastName",role,"isActive","tenantId","updatedAt") VALUES ('${u}','original@example.test','Nombre original','Apellido original','CLIENT',true,'${t}',now());
+      INSERT INTO "Profile" (id,"userId",phone) VALUES ('${randomUUID()}','${u}','+525500000001');
+      INSERT INTO "Branch" (id,"tenantId",name,address,"updatedAt") VALUES ('${b}','${t}','Sucursal','Ficticia',now());
+      INSERT INTO "Service" (id,"tenantId",name,price,"durationMin","updatedAt") VALUES ('${s}','${t}','Servicio',123.45,30,now());
+      INSERT INTO "Appointment" (id,"tenantId","clientId","branchId","serviceId","startTime","endTime",status,"updatedAt") VALUES ('${legacy}','${t}','${u}','${b}','${s}','2026-12-01 10:00','2026-12-01 11:00','AUTHORIZED',now());
+      INSERT INTO "BusinessSchedule" (id,"branchId","dayOfWeek","openTime","closeTime") VALUES ('${randomUUID()}','${b}',2,'09:00','18:00');`);
+    migrate(n=>n>='20261123000000');
+    const {db,api}=await start();
+    const password=randomBytes(12).toString('hex'),hash=await argon2.hash(password);
+    for(const [role,email] of [['ADMIN','admin-book@example.test'],['STAFF','staff-book@example.test']]) {
+      await db.user.create({data:{tenantId:t,email,firstName:'Personal',lastName:'Ficticio',role,isActive:true,password:hash}});
+    }
+    await db.user.update({where:{id:u},data:{password:hash}});
+    const token=(await api('/auth/login','POST',{email:'admin-book@example.test',password})).body.access_token;
+    const staff=(await api('/auth/login','POST',{email:'staff-book@example.test',password})).body.access_token;
+    const client=(await api('/auth/login','POST',{email:'original@example.test',password})).body.access_token;
+    assert.ok(token);assert.ok(staff);assert.ok(client);
+    const customer=await db.customer.findFirst({where:{tenantId:t,userId:u}});
+    const foreign=await db.customer.create({data:{tenantId:t2,firstName:'Otra',lastName:'Persona',email:'otra@example.test',phone:'+525500000002'}});
+    const panel={customerId:customer.id,branchId:b,serviceId:s,startTime:'2026-12-01T15:00:00.000Z'};
+    assert.equal((await api('/appointments','POST',{...panel,customerId:foreign.id},token)).status,404);
+    assert.equal((await api('/appointments','POST',panel,client)).status,403);
+    assert.equal((await api('/appointments','POST',{...panel,termsAccepted:true},token)).status,400);
+    const capture=await api('/appointments','POST',panel,token);
+    assert.equal(capture.status,201);assert.equal(capture.body.termsAcceptedAt,null);
+    assert.equal(capture.body.customer.id,customer.id);assert.equal(capture.body.branch.timezone,'America/Mexico_City');
+    assert.equal(capture.body.service.price,'123.45');assert.equal(capture.body.endTime,'2026-12-01T15:30:00.000Z');
+    assert.equal((await api('/appointments','POST',{...panel,startTime:'2026-12-01T15:30Z'},staff)).status,201);
+    assert.equal((await db.appointment.findUnique({where:{id:legacy}})).termsAcceptedAt,null);
+    const userBefore=await db.user.findUnique({where:{id:u}}), usersBefore=await db.user.count();
+    const pub={slug,branchId:b,serviceId:s,startTime:'2026-12-01T17:00:00.000Z',
+      clientInfo:{firstName:'No reemplazar',lastName:'Ni modificar',email:'distinto@example.test',phone:'+52 55 0000 0001'},termsAccepted:true};
+    const {termsAccepted,...missing}=pub;
+    assert.equal((await api('/appointments/public','POST',missing)).status,400);
+    assert.equal((await api('/appointments/public','POST',{...pub,termsAccepted:false})).status,400);
+    assert.equal((await api('/appointments/public','POST',{...pub,termsAcceptedAt:'2000-01-01T00:00:00Z'})).status,400);
+    assert.equal((await api('/appointments/public','POST',{...pub,clientInfo:[]})).status,400);
+    const before=Date.now();
+    const accepted=await api('/appointments/public','POST',pub);
+    assert.equal(accepted.status,201);
+    assert.deepEqual(Object.keys(accepted.body).sort(),['branch','endTime','id','payment','paymentExpiry','service','startTime','status']);
+    assert.doesNotMatch(JSON.stringify(accepted.body),/customerId|tenantId|clientInfo|original@example|Nombre original|password|token|receiptUrl/i);
+    const stored=await db.appointment.findUnique({where:{id:accepted.body.id}});
+    assert.equal(stored.customerId,customer.id);
+    assert.ok(stored.termsAcceptedAt.getTime()>=before && stored.termsAcceptedAt.getTime()<=Date.now());
+    assert.deepEqual(await db.customer.findUnique({where:{id:customer.id}}),customer);
+    assert.deepEqual(await db.user.findUnique({where:{id:u}}),userBefore);
+    const newPub={...pub,startTime:'2026-12-01T17:30:00Z',clientInfo:{...pub.clientInfo,phone:'+525500000003',email:'admin-book@example.test'}};
+    assert.equal((await api('/appointments/public','POST',newPub)).status,201);
+    assert.equal(await db.user.count(),usersBefore);
+    const countBefore=await db.customer.count({where:{tenantId:t}});
+    const failed={...newPub,startTime:panel.startTime,clientInfo:{...newPub.clientInfo,phone:'+525500000004'}};
+    assert.equal((await api('/appointments/public','POST',failed)).status,409);
+    assert.equal(await db.customer.count({where:{tenantId:t}}),countBefore);
+    assert.equal((await api('/appointments/public','POST',{...pub,customerId:foreign.id})).status,400);
+    assert.equal((await api('/appointments/public','POST',{...pub,slug:`otro-${t2}`})).status,404);
+    const detail=await api(`/clients/${customer.id}`,'GET',undefined,token);
+    assert.equal(detail.status,200);assert.ok(detail.body.appointments.every(a=>a.customer.id===customer.id && 'termsAcceptedAt' in a));
+    const mine=await api('/appointments/mine','GET',undefined,client);
+    assert.equal(mine.status,200);assert.ok(mine.body.every(a=>a.customerId===customer.id));
+    console.log('HTTP real: Customer ajeno 404; CLIENT 403; consentimiento ausente/falso/fecha ajena 400; público 201 mínimo, reloj servidor, User/Customer intactos y captura personal null.');
+  });
+});

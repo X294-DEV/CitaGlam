@@ -1,3 +1,6 @@
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { TenantGuard } from '../auth/guards/tenant.guard';
 import { Controller, Get, Post, Put, Patch, Delete, Body, Param, UseGuards, Query } from '@nestjs/common';
 import { BranchesService } from './branches.service';
 import { CreateBranchDto } from './dto/create-branch.dto';
@@ -10,7 +13,8 @@ import { CheckLimit } from '../subscriptions/decorators/check-limit.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @Controller('branches')
-@UseGuards(JwtAuthGuard, LimitsGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, TenantGuard, LimitsGuard)
+@Roles('ADMIN','STAFF')
 export class BranchesController {
   constructor(private readonly branchesService: BranchesService) {}
 

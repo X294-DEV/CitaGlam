@@ -5,7 +5,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { TenantGuard } from '../auth/guards/tenant.guard';
 import { Controller, Get, Post, Body, Patch, Delete, Param, UseGuards, Query, HttpStatus, HttpCode } from '@nestjs/common';
 import { AppointmentsService } from './appointments.service';
-import { CreateAppointmentDto } from './dto/create-appointment.dto';
+import { CreateAppointmentDto, CreatePublicAppointmentDto } from './dto/create-appointment.dto';
 import { RescheduleAppointmentDto } from './dto/reschedule-appointment.dto';
 import { UpdateAppointmentStatusDto } from './dto/update-appointment-status.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -29,14 +29,14 @@ export class AppointmentsController {
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, TenantGuard)
+  @Roles('ADMIN', 'STAFF')
   @HttpCode(HttpStatus.CREATED)
   async create(
     @Body() dto: CreateAppointmentDto,
     @CurrentUser() user: any,
   ) {
-    const authenticatedClientId = user.role === 'CLIENT' ? user.id : undefined;
-    return this.appointmentsService.create(dto, authenticatedClientId);
+    return this.appointmentsService.create(dto, user.tenantId);
   }
 
   // Límite por IP (ver config/rate-limits.ts). Sprint 1: aquí se integra el
@@ -45,8 +45,8 @@ export class AppointmentsController {
   @Throttle(RATE_LIMITS.publicBooking)
   @Post('public')
   @HttpCode(HttpStatus.CREATED)
-  async createPublic(@Body() dto: CreateAppointmentDto) {
-    return this.appointmentsService.create(dto);
+  async createPublic(@Body() dto: CreatePublicAppointmentDto) {
+    return this.appointmentsService.createPublic(dto);
   }
 
   @Get('mine')
