@@ -29,6 +29,7 @@ import {
   Hash
 } from 'lucide-angular';
 import Swal from 'sweetalert2';
+import { escapeHtml } from '../../../core/utils/escape-html';
 
 @Component({
   selector: 'app-saas-requests',
@@ -108,15 +109,15 @@ export class SaasRequestsComponent implements OnInit {
       html: `
         <div style="text-align: left; padding: 10px; font-family: 'Inter', sans-serif;">
           <p style="margin-bottom: 20px; font-size: 0.95rem; color: #4A5568; line-height: 1.5;">
-            Personaliza los términos finales para el negocio <span style="background: #EBF4F3; color: #2D4A47; padding: 2px 6px; border-radius: 4px; font-weight: 700;">${request.businessName}</span>.
+            Personaliza los términos finales para el negocio <span style="background: #EBF4F3; color: #2D4A47; padding: 2px 6px; border-radius: 4px; font-weight: 700;">${escapeHtml(request.businessName)}</span>.
           </p>
           
           <div style="margin-bottom: 20px;">
             <label style="display: block; font-size: 0.75rem; font-weight: 800; color: #718096; margin-bottom: 8px; text-transform: uppercase;">PAQUETE SELECCIONADO</label>
             <select id="proposal-package" class="swal2-input" style="width: 100%; height: 48px; margin: 0; padding: 0 12px; border-radius: 12px; border: 1.5px solid #E2E8F0; font-size: 0.95rem;">
               ${this.packages().map(p => `
-                <option value="${p.id}" ${p.id === (request.selectedPackageId || this.packages()[0].id) ? 'selected' : ''}>
-                  ${p.name} - $${p.price}/mes base
+                <option value="${escapeHtml(p.id)}" ${p.id === (request.selectedPackageId || this.packages()[0].id) ? 'selected' : ''}>
+                  ${escapeHtml(p.name)} - $${escapeHtml(p.price)}/mes base
                 </option>
               `).join('')}
             </select>
@@ -160,7 +161,7 @@ export class SaasRequestsComponent implements OnInit {
           const terms = pkg.pricesByTerm ? Object.keys(pkg.pricesByTerm).sort((a,b) => parseInt(a) - parseInt(b)) : ['1'];
           
           // Limpiar y repoblar select de meses
-          monthsSelect.innerHTML = terms.map(t => `<option value="${t}">${t} meses</option>`).join('');
+          monthsSelect.innerHTML = terms.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)} meses</option>`).join('');
           
           // Seleccionar el mes actual del request si coincide, o el primero
           if (request.monthsCount && terms.includes(request.monthsCount.toString())) {
@@ -308,7 +309,7 @@ export class SaasRequestsComponent implements OnInit {
                       ">
                         ${p.status === 'APPROVED' ? 'Aprobado' : p.status === 'REJECTED' ? 'Rechazado' : 'Esperando'}
                       </span>
-                      ${p.adminNotes ? `<p style="margin: 4px 0 0; font-size: 0.7rem; color: #E53E3E; font-style: italic;">Motivo: ${p.adminNotes}</p>` : ''}
+                      ${p.adminNotes ? `<p style="margin: 4px 0 0; font-size: 0.7rem; color: #E53E3E; font-style: italic;">Motivo: ${escapeHtml(p.adminNotes)}</p>` : ''}
                     </td>
                     <td style="padding: 12px 5px; text-align: center;">
                       <a href="#" aria-label="Ver comprobante" title="Ver comprobante" data-evidence="${encodeURIComponent(p.evidenceUrl ?? '')}" style="color: #4CAF50; text-decoration: none; cursor: pointer;">
@@ -325,7 +326,8 @@ export class SaasRequestsComponent implements OnInit {
         `;
 
         Swal.fire({
-          title: `Historial: ${request.businessName}`,
+          // titleText: el título se muestra como texto, no como HTML.
+          titleText: `Historial: ${request.businessName}`,
           html: html,
           width: '600px',
           confirmButtonText: 'Cerrar',

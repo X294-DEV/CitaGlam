@@ -28,7 +28,8 @@ export class NotificationService {
       ...this.baseOptions,
       icon: 'success',
       iconColor: this.secondaryColor,
-      title,
+      // titleText y text se muestran como texto: los datos de usuarios que lleguen aquí no se interpretan como HTML.
+      titleText: title,
       text,
       timer: 3000,
       showConfirmButton: false
@@ -40,7 +41,7 @@ export class NotificationService {
       ...this.baseOptions,
       icon: 'error',
       iconColor: '#DC2626',
-      title,
+      titleText: title,
       text
     });
   }
@@ -50,7 +51,7 @@ export class NotificationService {
       ...this.baseOptions,
       icon: 'question',
       iconColor: this.secondaryColor,
-      title,
+      titleText: title,
       text,
       showCancelButton: true,
       confirmButtonText,
