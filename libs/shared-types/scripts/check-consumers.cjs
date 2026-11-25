@@ -22,13 +22,13 @@ for (const appName of ['cgbg-admin', 'cgbg-client']) {
     CustomerDto, CustomerDetail, CreateCustomerRequest, AppointmentDto,
     CreateAppointmentRequest, CreatePublicAppointmentRequest,
     RescheduleAppointmentRequest, AvailabilityRequest, AvailabilityResponse,
-    BranchDto, PublicAppointmentResponse, ApiErrorResponse,
+    BranchDto, PublicAppointmentResponse, ApiErrorResponse, PublicTenantDto, PublicServiceDto,
   } from '@cgbg/shared-types';
   export type ConsumerContract = [
     CustomerDto, CustomerDetail, CreateCustomerRequest, AppointmentDto,
     CreateAppointmentRequest, CreatePublicAppointmentRequest,
     RescheduleAppointmentRequest, AvailabilityRequest, AvailabilityResponse,
-    BranchDto, PublicAppointmentResponse, ApiErrorResponse,
+    BranchDto, PublicAppointmentResponse, ApiErrorResponse, PublicTenantDto, PublicServiceDto,
   ];`;
   const host = ts.createCompilerHost(options);
   const originalGetSourceFile = host.getSourceFile.bind(host);

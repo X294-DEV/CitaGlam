@@ -3,7 +3,19 @@ import type {
   BranchDto, CreateAppointmentRequest, CreateCustomerRequest,
   CreatePublicAppointmentRequest, CustomerDto, CustomerDetail,
   PublicAppointmentResponse, RescheduleAppointmentRequest,
+  PublicTenantDto, PublicServiceDto,
 } from '../src';
+
+export const publicTenant = {
+  id: '55555555-5555-4555-8555-555555555555', name: 'Negocio de ejemplo',
+  slug: 'negocio-ejemplo', logoUrl: null,
+  config: { primaryColor: '#123456', secondaryColor: null, welcomeMessage: null, businessCategory: null },
+} satisfies PublicTenantDto;
+export const publicServices = [{
+  id: '33333333-3333-4333-8333-333333333333', name: 'Servicio de ejemplo',
+  description: null, durationMin: 90, price: '350', imageUrl: null, color: null,
+  category: { id: '77777777-7777-4777-8777-777777777777', name: 'Servicios', order: 0 },
+}] satisfies PublicServiceDto[];
 
 // Datos ficticios. 10:00 en Ciudad de México equivale a 16:00Z.
 const customerId = '11111111-1111-4111-8111-111111111111';
