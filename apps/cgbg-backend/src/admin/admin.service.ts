@@ -18,6 +18,7 @@ import { SendProposalDto } from './dto/send-proposal.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType, NotificationActionType } from '@prisma/client';
 import * as crypto from 'crypto';
+import { CaptchaService } from '../captcha/captcha.service';
 
 interface GlobalConfigUpdateDto {
   gracePeriodDays?: number;
@@ -38,6 +39,7 @@ export class AdminService {
     private prisma: PrismaService,
     @Inject('EmailProvider') private emailProvider: EmailProvider,
     private notificationsService: NotificationsService,
+    private captchaService: CaptchaService,
   ) {}
 
   async getStats() {
@@ -732,39 +734,7 @@ export class AdminService {
   // --- Business Request Management ---
 
   async submitBusinessRequest(dto: CreateBusinessRequestDto) {
-    const config = await this.prisma.globalConfig.findFirst({
-      where: { id: 'SYSTEM' },
-    });
-    const security = config?.security as any || {};
-    const secretKey = security.turnstileSecretKey;
-
-    // Turnstile verification if secretKey is configured
-    if (secretKey) {
-      if (!dto.turnstileToken) {
-        throw new ConflictException('La verificación de seguridad es obligatoria.');
-      }
-
-      try {
-        const verifyUrl = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
-        const response = await fetch(verifyUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            secret: secretKey,
-            response: dto.turnstileToken,
-          }),
-        });
-
-        const result = (await response.json()) as any;
-        if (!result.success) {
-          throw new ConflictException('Error en la verificación de seguridad (Captcha).');
-        }
-      } catch (e) {
-        console.error('Turnstile Error:', e);
-        if (e instanceof ConflictException) throw e;
-        throw new ConflictException('Error al contactar con el servicio de seguridad.');
-      }
-    }
+    await this.captchaService.verify(dto.turnstileToken);
     
     const request = await this.prisma.businessRequest.create({
       data: {

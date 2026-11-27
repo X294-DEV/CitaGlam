@@ -6,9 +6,10 @@ import { FinancialController } from './financial.controller';
 import { PrismaModule } from '@cgbg/prisma';
 import { EmailModule } from '@cgbg/email';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { CaptchaModule } from '../captcha/captcha.module';
 
 @Module({
-  imports: [PrismaModule, EmailModule, NotificationsModule],
+  imports: [PrismaModule, EmailModule, NotificationsModule, CaptchaModule],
   controllers: [AdminController, FinancialController],
   providers: [AdminService, FinancialService],
   exports: [AdminService, FinancialService],
