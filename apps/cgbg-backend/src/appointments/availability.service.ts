@@ -50,7 +50,7 @@ export class AvailabilityService {
       // Aioria eligió inicios espaciados por la duración desde la apertura de cada turno.
       while (start.getTime() + duration <= end.getTime()) {
         const finish = new Date(start.getTime() + duration);
-        if (!blocked.some(b => start < b.endTime && finish > b.startTime)) {
+        if (start.getTime() > Date.now() && !blocked.some(b => start < b.endTime && finish > b.startTime)) {
           slots.push({ startTime: start.toISOString(), endTime: finish.toISOString() });
         }
         start = finish;
