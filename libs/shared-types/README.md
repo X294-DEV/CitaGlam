@@ -133,7 +133,11 @@ Reprogramación:
 { "newStartTime": "2026-11-20T18:00:00.000Z", "reason": "Solicitud del cliente" }
 ```
 
-El servidor recalcula endTime. Una ocupación concurrente puede producir 409 aunque el rango se hubiera mostrado libre. Se excluye la propia cita al reprogramar; no se agrega un parámetro público que permita ignorar citas. La disponibilidad pública considera todas las ocupaciones, incluida la cita actual.
+El servidor recalcula endTime. Una ocupación concurrente puede producir 409 aunque el rango se hubiera mostrado libre. Se excluye la propia cita al guardar la reprogramación.
+
+Para poblar el selector del panel, `AvailabilityRequest` admite `excludeAppointmentId` opcional (#53). Enviar `Authorization: Bearer <JWT>` de ADMIN/STAFF: solo se excluye una cita existente del tenant tomado del JWT y de la sucursal consultada. Ejemplo: `GET /appointments/available?branchId=…&serviceId=…&date=2026-11-20&excludeAppointmentId=…`. Una cita ajena, de otra sucursal o inexistente se ignora y devuelve los mismos rangos normales, sin indicar si existe. No permite ignorar otras ocupaciones ni desactiva la restricción SQL al guardar.
+
+La ruta sigue siendo pública sin JWT: sin sesión, con rol distinto o sin tenant, el parámetro no excluye ocupaciones. Un Authorization enviado pero inválido/vencido devuelve 401. Los IDs deben ser UUID y la fecha calendario válida; query inválida devuelve 400. Sin el parámetro, se conserva el cálculo habitual. Se conserva el límite global existente de 300 peticiones por IP/minuto (`ThrottlerGuard` global); no se agrega otro umbral. Pareja 3 debe enviar el ID de la cita al cargar horarios para reprogramar; pareja 4 no necesita cambios.
 
 ## Errores y privacidad
 

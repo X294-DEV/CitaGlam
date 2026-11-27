@@ -5,17 +5,23 @@ import { LucideAngularModule, Search, UserPlus, MoreVertical, ExternalLink, Cale
 import { ClientService, Client } from '../../../core/services/client.service';
 import { ClientModalComponent } from '../client-modal/client-modal.component';
 import { Router } from '@angular/router';
+import { BranchService } from '../../../core/services/branch.service';
+import { ZonedDatePipe } from '../../../shared/zoned-date/zoned-date.pipe';
 
 @Component({
   selector: 'app-clients-list',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, ClientModalComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, ClientModalComponent, ZonedDatePipe],
   templateUrl: './clients-list.component.html',
   styleUrl: './clients-list.component.css'
 })
 export class ClientsListComponent implements OnInit {
   private clientService = inject(ClientService);
   private router = inject(Router);
+  private branchService = inject(BranchService);
+
+  /** Zona de la sucursal: la fecha de "última visita" se muestra aquí, no en la zona del navegador. */
+  branchTimezone = signal<string | null>(null);
 
   @ViewChild('clientModal') clientModal!: ClientModalComponent;
 
@@ -29,11 +35,16 @@ export class ClientsListComponent implements OnInit {
     return this.clients().filter(c => 
       c.firstName.toLowerCase().includes(term) || 
       c.lastName.toLowerCase().includes(term) || 
-      c.email.toLowerCase().includes(term)
+      c.email.toLowerCase().includes(term) ||
+      c.phone.replace(/\s+/g, '').includes(term.replace(/\s+/g, ''))
     );
   });
 
   ngOnInit(): void {
+    this.branchService.getMyBranch().subscribe({
+      next: (branch) => this.branchTimezone.set(branch.timezone),
+      error: () => this.branchTimezone.set(null),
+    });
     this.loadClients();
   }
 

@@ -47,6 +47,8 @@ export interface AvailabilityRequest {
   branchId: UUID;
   serviceId: UUID;
   date: LocalDate;
+  /** Solo con JWT ADMIN/STAFF: excluye una cita de su tenant y sucursal. */
+  excludeAppointmentId?: UUID;
 }
 export interface AvailabilitySlot {
   startTime: ISODateTime;

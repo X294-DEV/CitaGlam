@@ -239,3 +239,9 @@
   .form-grid { grid-template-columns: 1fr; }
   .modal-panel { border-radius: 24px 24px 0 0; position: absolute; bottom: 0; }
 }
+
+.appointment-summary { display: grid; gap: 0.6rem; margin: 0; }
+.appointment-summary div { display: grid; grid-template-columns: 90px 1fr; gap: 0.5rem; }
+.appointment-summary dt { color: #718096; font-weight: 700; font-size: 0.8rem; }
+.appointment-summary dd { margin: 0; font-weight: 600; }
+.field-hint { display: block; margin-top: 0.4rem; color: #718096; font-size: 0.78rem; }

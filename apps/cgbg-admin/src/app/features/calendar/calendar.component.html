@@ -27,7 +27,9 @@
     </div>
   </header>
 
-  <main class="calendar-grid-wrapper glass-panel" [attr.data-view]="view()">
+  <p class="calendar-error" *ngIf="loadError()" role="alert">{{ loadError() }}</p>
+
+  <main class="calendar-grid-wrapper glass-panel" [attr.data-view]="view()" *ngIf="timezone()">
     <ng-container *ngIf="view() !== 'month'; else monthView">
       <div
         class="week-days-row"
@@ -63,12 +65,12 @@
                 <div
                   *ngFor="let app of getAppointmentsForDayAndHour(day.date, hour)"
                   class="appointment-card"
-                  [style.border-left-color]="app.service?.color || '#4A8E8A'"
+                  [style.border-left-color]="app.service.color || '#4A8E8A'"
                   (click)="onAppointmentClick(app); $event.stopPropagation()"
                 >
-                  <span class="app-time">{{ formatAppointmentHour(app) }}</span>
-                  <span class="app-service">{{ app.service?.name }}</span>
-                  <span class="app-client">{{ app.client?.firstName }} {{ app.client?.lastName }}</span>
+                  <span class="app-time">{{ appointmentRange(app) }}</span>
+                  <span class="app-service">{{ app.service.name }}</span>
+                  <span class="app-client">{{ app.customer.firstName }} {{ app.customer.lastName }}</span>
 
                   <div class="status-indicator" [attr.data-status]="app.status">
                     <i-lucide
@@ -107,7 +109,7 @@
           class="month-day"
           [class.is-today]="day.isToday"
           [class.outside-month]="!day.isCurrentMonth"
-          (click)="onCellClick(day.date, 9)"
+          (click)="onCellClick(day.date)"
         >
           <div class="month-day-number">{{ day.dayNumber }}</div>
 
@@ -116,11 +118,11 @@
               *ngFor="let app of getAppointmentsForDay(day.date)"
               type="button"
               class="month-appointment"
-              [style.border-left-color]="app.service?.color || '#4A8E8A'"
+              [style.border-left-color]="app.service.color || '#4A8E8A'"
               (click)="onAppointmentClick(app); $event.stopPropagation()"
             >
-              <span>{{ formatAppointmentHour(app) }}</span>
-              {{ app.service?.name || 'Cita' }}
+              <span>{{ appointmentRange(app) }}</span>
+              {{ app.service.name || 'Cita' }}
             </button>
           </div>
         </div>

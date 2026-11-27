@@ -27,6 +27,8 @@ export interface Branch {
   address: string;
   city?: string;
   phone?: string;
+  /** Zona horaria IANA de la sucursal; las horas del panel se muestran en esta zona. */
+  timezone: string;
 }
 
 import { EnvironmentService } from './environment.service';

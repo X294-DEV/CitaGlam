@@ -3,7 +3,9 @@ import { CommonModule } from '@angular/common';
 import { LucideAngularModule, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Plus, Info, CheckCircle, Clock } from 'lucide-angular';
 import { AppointmentService, Appointment } from '../../core/services/appointment.service';
 import { AppointmentModalComponent } from './appointment-modal/appointment-modal.component';
-import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays, addMonths, format, isSameDay, isSameMonth } from 'date-fns';
+import { BranchService, Branch } from '../../core/services/branch.service';
+import { dateFromKey, dayKeyOf, localDateKey, localHour, localTime, todayKey } from '../../core/utils/branch-time';
+import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays, addMonths, differenceInCalendarDays, format, isSameMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 interface CalendarDay {
@@ -23,6 +25,7 @@ interface CalendarDay {
 })
 export class CalendarComponent implements OnInit {
   private appointmentService = inject(AppointmentService);
+  private branchService = inject(BranchService);
 
   @ViewChild('appointmentModal') appointmentModal!: AppointmentModalComponent;
 
@@ -30,6 +33,11 @@ export class CalendarComponent implements OnInit {
   currentDate = signal(new Date());
   appointments = signal<Appointment[]>([]);
   isLoading = signal(false);
+  branch = signal<Branch | null>(null);
+  loadError = signal('');
+
+  /** Zona de la sucursal: "hoy" y todas las horas se calculan aquí, no con la zona del navegador. */
+  timezone = computed(() => this.branch()?.timezone ?? null);
 
   // Time grid definition (09:00 to 20:00 as common range, can be dynamic later)
   hours = Array.from({ length: 14 }, (_, i) => i + 8); // 8am to 9pm
@@ -46,7 +54,7 @@ export class CalendarComponent implements OnInit {
     } else if (view === 'month') {
       start = startOfWeek(startOfMonth(current), { weekStartsOn: 1 });
       const end = endOfWeek(endOfMonth(current), { weekStartsOn: 1 });
-      length = Math.ceil((end.getTime() - start.getTime()) / 86400000) + 1;
+      length = differenceInCalendarDays(end, start) + 1;
     } else {
       start = startOfWeek(current, { weekStartsOn: 1 });
       length = 7;
@@ -58,7 +66,7 @@ export class CalendarComponent implements OnInit {
         date,
         label: format(date, 'eee d', { locale: es }),
         dayNumber: format(date, 'd', { locale: es }),
-        isToday: isSameDay(date, new Date()),
+        isToday: dayKeyOf(date) === this.todayKeyInBranch(),
         isCurrentMonth: isSameMonth(date, current)
       };
     });
@@ -80,6 +88,13 @@ export class CalendarComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    this.branchService.getMyBranch().subscribe({
+      next: (branch) => {
+        this.branch.set(branch);
+        this.currentDate.set(dateFromKey(todayKey(branch.timezone)));
+      },
+      error: () => this.loadError.set('No se pudo cargar la sucursal del negocio, por lo que no se puede mostrar la agenda.'),
+    });
     this.loadAppointments();
   }
 
@@ -94,13 +109,15 @@ export class CalendarComponent implements OnInit {
     });
   }
 
-  private toUtcDateKey(value: Date | string): string {
-    return new Date(value).toISOString().slice(0, 10);
+  private todayKeyInBranch(): string | null {
+    const timezone = this.timezone();
+    return timezone ? todayKey(timezone) : null;
   }
 
-  formatAppointmentHour(app: Appointment): string {
-    const date = new Date(app.startTime);
-    return `${date.getUTCHours().toString().padStart(2, '0')}:00`;
+  /** Horario de la cita en la zona de su sucursal, por ejemplo "09:30 – 10:15". */
+  appointmentRange(app: Appointment): string {
+    const timezone = app.branch.timezone;
+    return `${localTime(app.startTime, timezone)} – ${localTime(app.endTime, timezone)}`;
   }
 
   next() {
@@ -122,32 +139,35 @@ export class CalendarComponent implements OnInit {
   }
 
   today() {
-    this.currentDate.set(new Date());
+    const timezone = this.timezone();
+    this.currentDate.set(timezone ? dateFromKey(todayKey(timezone)) : new Date());
   }
 
   setView(view: 'day' | 'week' | 'month') {
     this.view.set(view);
   }
 
+  /** Citas que empiezan en esa hora del día (en la zona de la sucursal de cada cita). */
   getAppointmentsForDayAndHour(date: Date, hour: number): Appointment[] {
-    return this.appointments().filter(app => {
-      const appDate = new Date(app.startTime);
-      return this.toUtcDateKey(appDate) === this.toUtcDateKey(date) && appDate.getUTCHours() === hour;
-    });
+    const key = dayKeyOf(date);
+    return this.appointments().filter(app =>
+      localDateKey(app.startTime, app.branch.timezone) === key && localHour(app.startTime, app.branch.timezone) === hour
+    );
   }
 
   getAppointmentsForDay(date: Date): Appointment[] {
+    const key = dayKeyOf(date);
     return this.appointments()
-      .filter(app => this.toUtcDateKey(app.startTime) === this.toUtcDateKey(date))
+      .filter(app => localDateKey(app.startTime, app.branch.timezone) === key)
       .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
   }
 
   onNewAppointmentClick() {
-    this.appointmentModal.open({ date: this.currentDate(), hour: 9 });
+    this.appointmentModal.open({ date: dayKeyOf(this.currentDate()) });
   }
 
-  onCellClick(day: Date, hour: number) {
-    this.appointmentModal.open({ date: day, hour });
+  onCellClick(day: Date, hour?: number) {
+    this.appointmentModal.open({ date: dayKeyOf(day), hour });
   }
 
   onAppointmentClick(app: Appointment) {

@@ -65,8 +65,8 @@
               <span class="total-spent">{{ client.totalSpent | currency }}</span>
             </td>
             <td>
-              <span class="last-visit" *ngIf="client.lastVisit">
-                {{ client.lastVisit | date: 'dd/MM/yyyy' }}
+              <span class="last-visit" *ngIf="client.lastVisit && branchTimezone()">
+                {{ client.lastVisit | zoned: branchTimezone() : 'date' }}
               </span>
               <span class="last-visit-empty" *ngIf="!client.lastVisit">N/A</span>
             </td>

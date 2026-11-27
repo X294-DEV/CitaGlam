@@ -340,3 +340,5 @@
     min-width: 770px;
   }
 }
+
+.calendar-error { margin: 0 0 1rem; padding: 0.8rem 1rem; border-radius: 12px; background: #fff5f5; color: #c53030; font-weight: 600; }
