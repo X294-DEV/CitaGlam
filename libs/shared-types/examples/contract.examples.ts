@@ -35,6 +35,10 @@ export const branch = {
 export const availabilityQuery = {
   branchId, serviceId, date: '2026-11-20',
 } satisfies AvailabilityRequest;
+// Solo para el selector de reprogramación del panel, junto con JWT ADMIN/STAFF.
+export const rescheduleAvailabilityQuery = {
+  ...availabilityQuery, excludeAppointmentId: '44444444-4444-4444-8444-444444444444',
+} satisfies AvailabilityRequest;
 export const availability = [
   { startTime: '2026-11-20T16:00:00.000Z', endTime: '2026-11-20T17:30:00.000Z' },
   { startTime: '2026-11-20T18:00:00.000Z', endTime: '2026-11-20T19:30:00.000Z' },

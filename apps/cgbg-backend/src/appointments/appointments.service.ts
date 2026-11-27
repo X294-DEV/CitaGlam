@@ -327,6 +327,7 @@ export class AppointmentsService {
       row.serviceId,
       localDate(start, row.branch.timezone),
       row.id,
+      tenantId,
     );
     const slot = slots.find((s) => s.startTime === start.toISOString());
     if (!slot)
