@@ -1,5 +1,11 @@
 # Creación por Customer y términos — #33
 
+## Horarios futuros — #48
+
+La disponibilidad solo ofrece inicios posteriores al instante actual del servidor. La fecha solicitada sigue siendo calendario local de la sucursal y los rangos conservan sus instantes con zona. No se agrega un margen mínimo de anticipación. POST del panel, POST público y PATCH de reprogramación responden 409 con un mensaje explícito si el inicio ya pasó; se revalida junto a la escritura. No se cambian ni eliminan citas históricas.
+
+Prueba real en PostgreSQL y API locales, con base temporal ficticia: `node --env-file=.env --test apps/cgbg-backend/test/future-booking.security.cjs`. Comprueba hoy/ayer/mañana en México y Tokio, errores 409 sin cambios persistidos y reservas futuras 201.
+
 Integrar #30, #31 y #32 antes de este cambio. El PR de #33 incluye sus commits como dependencias explícitas para poder probar la combinación; todos los PR apuntan a main y no se reescribe historial.
 
 La migración agrega Appointment.termsAcceptedAt nullable Timestamptz(3), sin fabricar aceptación para datos históricos. POST /appointments exige JWT, ADMIN/STAFF y tenant y recibe customerId. Customer, sucursal y servicio se consultan dentro del tenant del JWT. Citas capturadas por personal guardan termsAcceptedAt null y rechazan información/aceptación embebida de cliente.

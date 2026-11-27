@@ -35,11 +35,17 @@ export class AppointmentsService {
     @Inject('EmailProvider') private emailProvider: EmailProvider,
   ) {}
 
+  private requireFuture(startTime: Date) {
+    if (startTime.getTime() <= Date.now())
+      throw new ConflictException('El horario debe ser futuro; el inicio seleccionado ya pasó.');
+  }
+
   private async bookingContext(
     dto: { branchId: string; serviceId: string; startTime: string },
     tenantId: string,
   ) {
     const startTime = parseInstant(dto.startTime);
+    this.requireFuture(startTime);
     const service = await this.prisma.service.findFirst({
       where: { id: dto.serviceId, tenantId },
     });
@@ -67,6 +73,8 @@ export class AppointmentsService {
     customerId: string,
     termsAcceptedAt: Date | null,
   ) {
+    // Revalidar junto a la escritura: el horario pudo vencer durante las consultas.
+    this.requireFuture(context.startTime);
     return {
       tenantId: context.service.tenantId,
       branchId: context.branch.id,
@@ -322,6 +330,7 @@ export class AppointmentsService {
         'Solo se pueden reprogramar citas pendientes o autorizadas.',
       );
     const start = parseInstant(dto.newStartTime);
+    this.requireFuture(start);
     const slots = await this.availability.getAvailableSlots(
       row.branchId,
       row.serviceId,
@@ -333,13 +342,14 @@ export class AppointmentsService {
       throw new ConflictException(
         'El nuevo horario seleccionado no está disponible.',
       );
-    const updated = await saveWithSlotConflict(() =>
-      this.prisma.appointment.update({
+    const updated = await saveWithSlotConflict(() => {
+      this.requireFuture(start);
+      return this.prisma.appointment.update({
         where: { id, tenantId },
         data: { startTime: start, endTime: new Date(slot.endTime) },
         include: appointmentInclude,
-      }),
-    );
+      });
+    });
     await this.notify(
       updated,
       'appointment-rescheduled',

@@ -24,7 +24,8 @@ exports.withLocalApiDatabase = async function (port, run) {
   function migrate(predicate) {
     for(const dir of all.filter(predicate))sql(fs.readFileSync(path.join(migrations,dir,'migration.sql'),'utf8'));
   }
-  url.hostname='localhost';url.port='5433';url.pathname=`/${name}`;
+  // Compose publica PostgreSQL en IPv4; localhost puede resolver a ::1 en Windows.
+  url.hostname='127.0.0.1';url.port='5433';url.pathname=`/${name}`;
   try {
     await run({sql,migrate,url:url.toString(),async start() {
       db=new PrismaClient({datasources:{db:{url:url.toString()}}});
