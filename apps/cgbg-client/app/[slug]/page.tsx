@@ -12,16 +12,29 @@ async function getJson<T>(path: string): Promise<T> {
   return res.json();
 }
 
+/** Clave pública de Turnstile. Si el backend no responde, el formulario sigue sin widget. */
+async function getTurnstileSiteKey(): Promise<string | null> {
+  try {
+    const res = await fetch(`${internalApiUrl}/auth/config/public`, { cache: "no-store" });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { turnstileSiteKey?: string };
+    return body.turnstileSiteKey || null;
+  } catch {
+    return null;
+  }
+}
+
 export default async function TenantBookingPage({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const [tenant, branches, services] = await Promise.all([
+  const [tenant, branches, services, turnstileSiteKey] = await Promise.all([
     getJson<PublicTenantDto>(`/tenants/config/${slug}`),
     getJson<BranchDto[]>(`/tenants/public/${slug}/branches`),
     getJson<PublicServiceDto[]>(`/tenants/public/${slug}/services`),
+    getTurnstileSiteKey(),
   ]);
 
   return (
@@ -59,7 +72,12 @@ export default async function TenantBookingPage({
           </div>
         </div>
 
-        <BookingForm slug={slug} branches={branches} services={services} />
+        <BookingForm
+          slug={slug}
+          branches={branches}
+          services={services}
+          turnstileSiteKey={turnstileSiteKey}
+        />
       </section>
     </main>
   );

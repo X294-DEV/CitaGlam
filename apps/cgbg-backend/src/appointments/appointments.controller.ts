@@ -11,6 +11,7 @@ import { UpdateAppointmentStatusDto } from './dto/update-appointment-status.dto'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AvailabilityService } from './availability.service';
+import { CaptchaService } from '../captcha/captcha.service';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { AvailabilityQueryDto } from './dto/availability-query.dto';
 
@@ -19,6 +20,7 @@ export class AppointmentsController {
   constructor(
     private readonly appointmentsService: AppointmentsService,
     private readonly availabilityService: AvailabilityService,
+    private readonly captcha: CaptchaService,
   ) {}
 
   @Get('available')
@@ -46,13 +48,13 @@ export class AppointmentsController {
     return this.appointmentsService.create(dto, user.tenantId);
   }
 
-  // Límite por IP (ver config/rate-limits.ts). Sprint 1: aquí se integra el
-  // captcha (Cloudflare Turnstile): validar el token del DTO antes de llamar
-  // a appointmentsService.create y rechazar con 400 si es inválido.
+  // Límite por IP (ver config/rate-limits.ts) y desafío Cloudflare Turnstile:
+  // el token se valida antes de tocar la base y se rechaza con 400 si es inválido.
   @Throttle(RATE_LIMITS.publicBooking)
   @Post('public')
   @HttpCode(HttpStatus.CREATED)
   async createPublic(@Body() dto: CreatePublicAppointmentDto) {
+    await this.captcha.verify(dto.turnstileToken);
     return this.appointmentsService.createPublic(dto);
   }
 

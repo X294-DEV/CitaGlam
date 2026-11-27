@@ -71,6 +71,8 @@ export interface CreatePublicAppointmentRequest {
   clientInfo: CustomerInput;
   /** Confirmación expresa en ESTA reserva, nunca dentro de Customer. */
   termsAccepted: true;
+  /** Token de Cloudflare Turnstile. Obligatorio si el servidor tiene clave secreta configurada. */
+  turnstileToken?: string;
   notes?: string;
 }
 export interface RescheduleAppointmentRequest {

@@ -93,6 +93,8 @@ Tenant exclusivamente del JWT. Customer, sucursal y servicio deben ser del mismo
 
 Se conserva clientInfo para los datos embebidos; la aceptación pasa al nivel de la cita. slug selecciona el negocio; el servidor verifica que sucursal/servicio le pertenezcan. Rechazar tenantId y customerId públicos. Resolver/crear Customer por teléfono dentro del tenant, nunca por email global sobre User. Encontrar un teléfono no autoriza sobrescribir los datos del Customer existente. No devolver su identidad almacenada.
 
+Desafío anti-bots (#37): el formulario público manda además `turnstileToken` (Cloudflare Turnstile). Con clave secreta configurada es obligatorio y se verifica antes de crear la cita (400 si falta o es inválido; 503 si no se puede verificar). La clave pública sale de `GET /auth/config/public` (`turnstileSiteKey`).
+
 La aceptación pública exige el booleano literal true y guarda termsAcceptedAt con el reloj del servidor dentro de la creación de la cita. No se acepta una fecha enviada por el navegador. Captura por personal: termsAcceptedAt null. Datos históricos sin evidencia: null; no fabricar aceptaciones retroactivas.
 
 Confirmación pública mínima:
