@@ -16,13 +16,13 @@
 | Sprint | Fechas | Objetivo |
 | --- | --- | --- |
 | 0 | 11-13 nov | Git y repo, `AGENTS.md`, y los críticos de seguridad de la auditoría |
-| 1 | 14-18 nov | Núcleo: modelo `Customer`, zona horaria por sucursal, `durationMin`, restricción contra citas encimadas, captcha en reserva pública |
-| 2 | 19-22 nov | El cliente recibe su link: token de pago en Postgres, pg-boss, correo y WhatsApp (número de prueba) |
-| 3 | 23-26 nov | Prueba de punta a punta, despliegue de la demo y CRUD de productos (deseable) |
-| 4 | 27-30 nov | Pulido, bugs, documentación, vitrina pública de productos (deseable) y guion de la demo |
-| Margen | 1-2 dic | Ensayo y correcciones. Sin funciones nuevas |
+| 1 | 14-18 nov (cerrado el 26 nov) | Núcleo: modelo `Customer`, zona horaria por sucursal, `durationMin`, restricción contra citas encimadas, captcha en reserva pública |
+| 2 | 26-29 nov | El cliente recibe su link: token de pago en Postgres, pg-boss (sin Redis ni RabbitMQ), correo, `directUrl` para Neon, captcha del registro de negocio y arreglos de seguridad del panel. WhatsApp (número de prueba) solo si sobra tiempo |
+| 3 | 30 nov-1 dic | Despliegue de la demo (Vercel, Neon y backend con contenedor), prueba de punta a punta y guion. Productos queda fuera |
+| 4 | 2 dic | Ensayo de la demo, correcciones y documentación. Sin funciones nuevas |
+| Entrega | 3 dic | Presentación |
 
-Orden de recorte si hay retraso: 1) productos, 2) WhatsApp (queda solo correo), 3) pulido visual. El Sprint 2 con correo es el mínimo para una demo completa.
+Calendario recortado el 26 de noviembre por el atraso del Sprint 1 y el Sprint 2 (decisión de Adrián). Productos ya no entra en la entrega. Orden de recorte si hay más retraso: 1) productos, 2) WhatsApp (queda solo correo), 3) pulido visual. El Sprint 2 con correo es el mínimo para una demo completa.
 
 ## Decisiones de producto tomadas
 
