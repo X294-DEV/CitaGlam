@@ -5,10 +5,9 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '@cgbg/prisma';
+import { PAYMENT_LINK_TTL_MS, PrismaService } from '@cgbg/prisma';
 import { Prisma } from '@prisma/client';
 import { EmailProvider } from '@cgbg/email';
-import { addHours } from 'date-fns';
 import {
   CreateAppointmentDto,
   CreatePublicAppointmentDto,
@@ -84,7 +83,7 @@ export class AppointmentsService {
       endTime: context.endTime,
       notes: dto.notes,
       termsAcceptedAt,
-      paymentExpiry: addHours(new Date(), 24),
+      paymentExpiry: new Date(Date.now() + PAYMENT_LINK_TTL_MS),
       status: 'PENDING_PAYMENT' as const,
       payment: {
         create: { amount: context.service.price, method: 'TRANSFER' as const },

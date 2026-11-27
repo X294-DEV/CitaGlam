@@ -14,7 +14,7 @@ POST /appointments/public recibe slug, branchId, serviceId, startTime ISO con zo
 
 Las respuestas del panel, listados, mutaciones y detalle de clientes se serializan al AppointmentDto publicado. La confirmación pública usa solo PublicAppointmentResponse: sin customerId, tenantId, datos de contacto, tokens ni referencias de comprobantes. El vínculo interno User/Customer se usa exclusivamente para /appointments/mine autenticado, siempre limitado también al tenant del JWT; sin tenant se responde 403.
 
-Desplegar coordinadamente con #35/#36: el formulario antiguo que envía términos dentro de clientInfo y el panel que envía datos embebidos ya no son válidos. Se conservan los límites de peticiones existentes. Captcha sigue en #37. paymentExpiry conserva temporalmente 24 h hasta integrar PaymentLink/vigencia acordada de Sprint 2; este issue no modifica cola, worker ni comprobantes.
+Desplegar coordinadamente con #35/#36: el formulario antiguo que envía términos dentro de clientInfo y el panel que envía datos embebidos ya no son válidos. Se conservan los límites de peticiones existentes. Captcha sigue en #37. Desde #56, paymentExpiry de nuevas citas es de 60 minutos y PaymentLinkService comparte esa vigencia; ver PAYMENT_LINKS.md. La conexión del worker y comprobantes con PostgreSQL corresponde a #57. Este contrato no modifica cola, worker ni comprobantes.
 
 Comprobación integrada aislada (cada caso crea y elimina únicamente su base ficticia):
 
