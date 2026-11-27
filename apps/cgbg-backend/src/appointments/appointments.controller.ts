@@ -11,6 +11,8 @@ import { UpdateAppointmentStatusDto } from './dto/update-appointment-status.dto'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AvailabilityService } from './availability.service';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
+import { AvailabilityQueryDto } from './dto/availability-query.dto';
 
 @Controller('appointments')
 export class AppointmentsController {
@@ -20,12 +22,17 @@ export class AppointmentsController {
   ) {}
 
   @Get('available')
+  @UseGuards(OptionalJwtAuthGuard)
   async getAvailableSlots(
-    @Query('branchId') branchId: string,
-    @Query('serviceId') serviceId: string,
-    @Query('date') date: string,
+    @Query() query: AvailabilityQueryDto,
+    @CurrentUser() user?: { tenantId: string | null; role: string },
   ) {
-    return this.availabilityService.getAvailableSlots(branchId, serviceId, date);
+    const exclusionTenantId = user && ['ADMIN', 'STAFF'].includes(user.role)
+      ? user.tenantId ?? undefined : undefined;
+    return this.availabilityService.getAvailableSlots(
+      query.branchId, query.serviceId, query.date,
+      query.excludeAppointmentId, exclusionTenantId,
+    );
   }
 
   @Post()

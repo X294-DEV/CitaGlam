@@ -7,7 +7,7 @@ import type { AvailabilitySlot } from '@cgbg/shared-types';
 export class AvailabilityService {
   constructor(private prisma: PrismaService) {}
 
-  async getAvailableSlots(branchId: string, serviceId: string, date: string, excludeAppointmentId?: string) {
+  async getAvailableSlots(branchId: string, serviceId: string, date: string, excludeAppointmentId?: string, exclusionTenantId?: string) {
     validateLocalDate(date);
     const service = await this.prisma.service.findUnique({ where: { id: serviceId } });
     if (!service) throw new NotFoundException('Servicio no encontrado.');
@@ -16,6 +16,14 @@ export class AvailabilityService {
     }
     const branch = await this.prisma.branch.findUnique({ where: { id: branchId } });
     if (!branch || branch.tenantId !== service.tenantId) throw new NotFoundException('Sucursal no encontrada.');
+    // Nunca confiar en el ID de la query para quitar ocupaciones públicas.
+    // El tenant llega del JWT (o del flujo interno de reprogramación autorizado).
+    const excluded = excludeAppointmentId && exclusionTenantId === branch.tenantId
+      ? await this.prisma.appointment.findFirst({
+          where: { id: excludeAppointmentId, tenantId: exclusionTenantId, branchId },
+          select: { id: true },
+        })
+      : null;
     const dayOfWeek = new Date(`${date}T12:00:00Z`).getUTCDay();
     const schedule = await this.prisma.businessSchedule.findUnique({ where: { dayOfWeek_branchId: { branchId, dayOfWeek } } });
     if (!schedule?.isOpen) return [];
@@ -23,7 +31,7 @@ export class AvailabilityService {
     const next = new Date(`${date}T12:00:00Z`); next.setUTCDate(next.getUTCDate() + 1);
     const dayEnd = await wallTime(this.prisma, next.toISOString().slice(0,10), '00:00', branch.timezone);
     const appointments = await this.prisma.appointment.findMany({ where: {
-      tenantId: service.tenantId, branchId, id: excludeAppointmentId ? { not: excludeAppointmentId } : undefined,
+      tenantId: service.tenantId, branchId, id: excluded ? { not: excluded.id } : undefined,
       startTime: { lt: dayEnd }, endTime: { gt: dayStart },
       status: { in: ['PENDING_PAYMENT', 'WAITING_APPROVAL', 'AUTHORIZED'] },
     }, select: { startTime: true, endTime: true } });
